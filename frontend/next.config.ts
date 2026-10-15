@@ -30,6 +30,17 @@ const nextConfig: NextConfig = {
     // /api/* es el proxy: conserva las cabeceras de seguridad que define la API (incluida la CSP de /api/docs).
     return [{ source: "/((?!api/).*)", headers: securityHeaders }];
   },
+  async redirects() {
+    // www.<dominio> → <dominio> (una sola URL canónica).
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www\\.(?<domain>.+)" }],
+        destination: "https://:domain/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
