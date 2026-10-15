@@ -15,13 +15,17 @@ class Settings(BaseSettings):
 
     app_env: str = Field(default="development", description="development | test | production")
     database_url: str = "postgresql+psycopg://wfa:wfa@localhost:5432/wfa"
+    db_pool_size: int = 10
     storage_dir: Path = Path("./storage")
 
     # Seguridad
     session_ttl_hours: int = 12
     cookie_secure: bool = False
     cookie_domain: str | None = None
-    trusted_proxies: str = ""  # IPs separadas por coma cuyo X-Forwarded-For se acepta
+    trusted_proxies: str = ""  # IPs o rangos CIDR separados por coma cuyo X-Forwarded-For se acepta
+    # Secreto compartido con el proxy de Next.js (Vercel): permite confiar en la IP real del visitante
+    # aunque el proxy no tenga IP fija. Vacío = desactivado.
+    proxy_shared_secret: str | None = None
     cors_origins: str = ""  # orígenes separados por coma (vacío = mismo origen vía proxy de Next.js)
     public_uploads: bool = False  # si es False, importar requiere usuario uploader/admin o API key
 
@@ -60,6 +64,16 @@ class Settings(BaseSettings):
     blizzard_forever_namespace: str | None = None
 
     log_level: str = "INFO"
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, v: str) -> str:
+        """Acepta la URL tal como la entregan Neon, Render o Heroku (postgres:// o postgresql://)."""
+        if v.startswith("postgres://"):
+            v = "postgresql://" + v[len("postgres://") :]
+        if v.startswith("postgresql://"):
+            v = "postgresql+psycopg://" + v[len("postgresql://") :]
+        return v
 
     @field_validator("storage_dir")
     @classmethod

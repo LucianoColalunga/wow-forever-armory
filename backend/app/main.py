@@ -19,6 +19,7 @@ from app import __version__
 from app.api.v1 import admin, auth, content, health, meta, players, rankings, reports, search
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.worker.queue import inline_wakeup, notify_new_job
 
 log = logging.getLogger("wfa.api")
 
@@ -71,6 +72,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         threading.Thread(target=_inline_worker, args=(stop,), daemon=True, name="inline-worker").start()
     yield
     stop.set()
+    notify_new_job()  # despierta al worker interno para que termine
 
 
 def _inline_worker(stop: threading.Event) -> None:
@@ -86,7 +88,8 @@ def _inline_worker(stop: threading.Event) -> None:
                 heartbeat(db)
                 job = claim_next(db)
                 if job is None:
-                    stop.wait(settings.worker_poll_seconds)
+                    inline_wakeup.wait(settings.worker_poll_seconds)
+                    inline_wakeup.clear()
                     continue
                 run_job(db, settings, job)
         except Exception:

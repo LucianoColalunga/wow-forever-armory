@@ -141,7 +141,7 @@ curl -H "Authorization: Bearer wfa_TU_API_KEY" -F "file=@WoWCombatLog.txt" -F "g
 - [docs/METHODOLOGY.md](docs/METHODOLOGY.md) — métricas, métodos de ranking, deduplicación y parser.
 - [docs/SECURITY.md](docs/SECURITY.md) — autenticación, autorización, validación de archivos y privacidad.
 - [docs/OPERATIONS.md](docs/OPERATIONS.md) — health checks, logs, backups, restauración y mantenimiento.
-- [docs/DEPLOY.md](docs/DEPLOY.md) — despliegue a producción.
+- [docs/DEPLOY.md](docs/DEPLOY.md) — despliegue a producción, incluido un esquema 100 % gratis (Vercel + Neon + Render).
 - [backend/tests/fixtures/logs/README.md](backend/tests/fixtures/logs/README.md) — logs de prueba y resultados esperados.
 
 ## Variables de entorno

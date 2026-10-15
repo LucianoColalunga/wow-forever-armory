@@ -7,6 +7,7 @@ por Redis sin cambiar las dependencias de FastAPI que lo usan.
 
 from __future__ import annotations
 
+import hmac
 import ipaddress
 import threading
 import time
@@ -65,8 +66,20 @@ def client_ip(request: Request) -> str:
 
     TRUSTED_PROXIES acepta IPs o rangos CIDR (p. ej. ``172.16.0.0/12`` para la red de Docker).
     """
+    settings = get_settings()
+    secret = settings.proxy_shared_secret
+    if secret:
+        # El proxy de Next.js (Vercel) no tiene IP fija: se identifica con un secreto compartido.
+        given = request.headers.get("x-wfa-proxy-secret", "")
+        forwarded_ip = request.headers.get("x-wfa-client-ip", "").strip()
+        if given and forwarded_ip and hmac.compare_digest(given.encode(), secret.encode()):
+            try:
+                ipaddress.ip_address(forwarded_ip)
+                return forwarded_ip[:64]
+            except ValueError:
+                pass
     peer = request.client.host if request.client else "unknown"
-    networks = get_settings().trusted_proxy_networks
+    networks = settings.trusted_proxy_networks
     if networks and _trusted(peer, networks):
         fwd = request.headers.get("x-forwarded-for", "")
         parts = [p.strip() for p in fwd.split(",") if p.strip()]

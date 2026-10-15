@@ -19,10 +19,12 @@ RUN pip install -r /tmp/req.txt
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app
+COPY scripts/start.sh ./scripts/start.sh
 
 RUN mkdir -p /data/storage && chown -R wfa:wfa /data /app
 USER wfa
 
 ENV STORAGE_DIR=/data/storage
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+# Migraciones + catálogo + servidor en $PORT (ver scripts/start.sh).
+CMD ["sh", "scripts/start.sh"]

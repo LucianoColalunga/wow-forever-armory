@@ -21,7 +21,7 @@ services:
 
   api:
     build: ./backend
-    command: ["sh", "-c", "alembic upgrade head && python -m app.cli sync-catalog && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "scripts/start.sh"]
     env_file:
       - path: .env
         required: false

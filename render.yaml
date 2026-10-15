@@ -1,0 +1,39 @@
+# Blueprint de Render para la API (plan gratis). Ver docs/DEPLOY.md → "Despliegue gratis".
+# La base de datos es Neon (gratis) y la web va en Vercel (gratis).
+services:
+  - type: web
+    name: wow-forever-armory-api
+    runtime: docker
+    plan: free
+    region: virginia # cerca de Neon (aws-us-east-1) y de las funciones de Vercel (iad1)
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health/ready
+    autoDeployTrigger: commit
+    envVars:
+      # Secretos: Render los pide al crear el Blueprint (no quedan en el repositorio).
+      - key: DATABASE_URL # cadena de conexión de Neon (la directa, sin "-pooler")
+        sync: false
+      - key: ADMIN_BOOTSTRAP_EMAIL # email del primer admin
+        sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD # contraseña del primer admin (borrala después del primer arranque)
+        sync: false
+      - key: PROXY_SHARED_SECRET # se genera solo; copiá el mismo valor en Vercel
+        generateValue: true
+      # Configuración
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: INLINE_WORKER # el plan gratis no incluye workers aparte
+        value: "true"
+      - key: WORKER_POLL_SECONDS # el worker se despierta al importar; sondear poco deja dormir a Neon
+        value: "900"
+      - key: DB_POOL_SIZE
+        value: "3"
+      - key: SEED_DEMO # datos de demostración marcados como DEMO
+        value: "true"
+      - key: MAX_UPLOAD_MB
+        value: "100"
+      - key: LOG_LEVEL
+        value: INFO

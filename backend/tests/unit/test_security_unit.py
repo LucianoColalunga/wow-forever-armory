@@ -33,6 +33,36 @@ def test_client_ip_uses_forwarded_header_from_trusted_cidr(monkeypatch: pytest.M
     assert client_ip(_req("172.18.0.4", "198.51.100.7, 172.18.0.9")) == "198.51.100.7"
 
 
+def _req_secret(peer: str, secret: str, ip: str) -> Request:
+    headers = [(b"x-wfa-proxy-secret", secret.encode()), (b"x-wfa-client-ip", ip.encode())]
+    return Request({"type": "http", "client": (peer, 1234), "headers": headers, "method": "GET", "path": "/"})
+
+
+def test_client_ip_from_proxy_with_shared_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(get_settings(), "trusted_proxies", "")
+    monkeypatch.setattr(get_settings(), "proxy_shared_secret", "secreto-de-prueba")
+    assert client_ip(_req_secret("10.1.2.3", "secreto-de-prueba", "198.51.100.7")) == "198.51.100.7"
+    # Sin el secreto correcto o con una IP inválida se usa el par inmediato.
+    assert client_ip(_req_secret("10.1.2.3", "otro", "198.51.100.7")) == "10.1.2.3"
+    assert client_ip(_req_secret("10.1.2.3", "secreto-de-prueba", "no-es-ip")) == "10.1.2.3"
+    monkeypatch.setattr(get_settings(), "proxy_shared_secret", None)
+    assert client_ip(_req_secret("10.1.2.3", "secreto-de-prueba", "198.51.100.7")) == "10.1.2.3"
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("postgres://u:p@h/db", "postgresql+psycopg://u:p@h/db"),
+        ("postgresql://u:p@h/db?sslmode=require", "postgresql+psycopg://u:p@h/db?sslmode=require"),
+        ("postgresql+psycopg://u:p@h/db", "postgresql+psycopg://u:p@h/db"),
+    ],
+)
+def test_database_url_is_normalized(raw: str, expected: str) -> None:
+    from app.core.config import Settings
+
+    assert Settings(database_url=raw).database_url == expected
+
+
 def test_sliding_window_limiter() -> None:
     lim = SlidingWindowLimiter()
     assert [lim.hit("k", 2, 60)[0] for _ in range(3)] == [True, True, False]

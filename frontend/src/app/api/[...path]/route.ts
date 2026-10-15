@@ -53,6 +53,12 @@ async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }
   const fwd = req.headers.get("x-forwarded-for");
   const clientIp = fwd?.split(",").pop()?.trim() || req.headers.get("x-real-ip");
   if (clientIp) headers.set("x-forwarded-for", clientIp);
+  // En Vercel el proxy no tiene IP fija: la API sólo acepta esta IP si viene con el secreto compartido.
+  const secret = process.env.PROXY_SHARED_SECRET;
+  if (secret && clientIp) {
+    headers.set("x-wfa-proxy-secret", secret);
+    headers.set("x-wfa-client-ip", clientIp);
+  }
 
   const init: RequestInit & { duplex?: "half" } = { method: req.method, headers, redirect: "manual" };
   if (!["GET", "HEAD"].includes(req.method)) {

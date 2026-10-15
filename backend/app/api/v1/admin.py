@@ -33,6 +33,7 @@ from app.rankings import cache
 from app.schemas import Email, ReasonIn, UserOut
 from app.services import audit
 from app.services.queries import character_dict, count_of, fight_summary, instance_dict, paged
+from app.worker.queue import notify_new_job
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -145,6 +146,7 @@ def retry_job(job_id: int, body: ReasonIn, request: Request, ctx: AdminAuth, db:
         ip=client_ip(request),
     )
     db.commit()
+    notify_new_job()
     return {"id": job.id, "status": job.status}
 
 
@@ -208,6 +210,7 @@ def reprocess(
         ip=client_ip(request),
     )
     db.commit()
+    notify_new_job()
     return {"report_id": r.public_id, "job_id": job.id, "status": "queued"}
 
 

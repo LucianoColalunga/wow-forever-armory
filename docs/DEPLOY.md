@@ -35,19 +35,58 @@ docker compose exec api python -m app.cli create-admin --email tu-email@ejemplo.
 ## Opción gestionada
 
 - **Base**: PostgreSQL gestionado con la extensión `pg_trgm` habilitada (Neon, Supabase, RDS…).
-- **API + worker**: dos servicios desde `backend/Dockerfile` (Render, Fly.io, Railway…). Comandos:
-  `alembic upgrade head && python -m app.cli sync-catalog && uvicorn app.main:app --host 0.0.0.0 --port 8000`
-  para la API y `python -m app.worker` para el worker, con un **volumen persistente** en
+- **API + worker**: dos servicios desde `backend/Dockerfile` (Render, Fly.io, Railway…). La imagen
+  arranca con `scripts/start.sh` (migraciones, catálogo y servidor en `$PORT`) y el worker con
+  `python -m app.worker`, con un **volumen persistente** en
   `STORAGE_DIR` compartido o, si la plataforma no lo permite, un único servicio con
   `INLINE_WORKER=true`.
 - **Web**: `frontend/Dockerfile` con `API_INTERNAL_URL` apuntando a la API.
 
-### Sobre Vercel
+## Despliegue gratis: Vercel + Neon + Render
 
-La web puede desplegarse en Vercel para navegación, pero las funciones serverless de Vercel limitan
-el cuerpo de la solicitud (4,5 MB) y la importación pasa por el proxy `/api`. Para importar logs
-reales (decenas o cientos de MB) desplegá la web como contenedor o usá la API directamente con una
-API key (`curl … /api/v1/reports/import`).
+Todo con planes gratuitos (relevado en octubre de 2026). Es ideal para mostrar el proyecto con los
+datos DEMO; para uso real intenso conviene un servidor pago chico.
+
+| Parte | Servicio gratis | Límites a tener en cuenta |
+|---|---|---|
+| Web (Next.js) | Vercel Hobby | Cada pedido a una función admite como máximo **4,5 MB** de cuerpo y 300 s. |
+| Base de datos | Neon Free | 0,5 GB por proyecto y 100 CU-hora/mes; se suspende tras 5 min sin actividad. Soporta `pg_trgm`. |
+| API + procesamiento | Render Free (`render.yaml`) | Se duerme tras 15 min sin visitas (tarda ~1 min en despertar), 750 h/mes, 512 MB de RAM, **sin worker aparte ni disco persistente**. |
+
+Consecuencias del plan gratis:
+- El procesamiento corre dentro de la API (`INLINE_WORKER=true`); se despierta al importar y sondea
+  la base cada 15 minutos para que Neon pueda dormir.
+- Los archivos de log originales viven en el disco efímero de Render: los datos procesados quedan en
+  Neon, pero tras un reinicio no se puede **reprocesar** un reporte viejo.
+- Logs de más de 4,5 MB no pasan por la web en Vercel: subilos directo a la API de Render con una
+  API key (ver más abajo).
+- No configures "pingers" para mantener despierta la API: Neon gastaría su cuota mensual de cómputo.
+
+### Pasos
+
+1. **Neon** (neon.com, se puede entrar con GitHub): crear un proyecto en la región
+   *AWS US East (N. Virginia)* y copiar la cadena de conexión **directa** (sin `-pooler`).
+2. **Render** (render.com, entrar con GitHub): *New → Blueprint*, elegir este repositorio. Render lee
+   `render.yaml` y pide:
+   - `DATABASE_URL`: la cadena de Neon (se acepta tal cual, con `postgresql://`).
+   - `ADMIN_BOOTSTRAP_EMAIL` y `ADMIN_BOOTSTRAP_PASSWORD`: el primer admin (12+ caracteres con
+     mayúsculas, minúsculas y números). Después del primer arranque, borrá la contraseña de las
+     variables de Render.
+   - `PROXY_SHARED_SECRET` se genera solo.
+   Al arrancar, `scripts/start.sh` aplica migraciones, sincroniza el catálogo, crea el admin y carga
+   los datos DEMO. Verificá `https://<servicio>.onrender.com/api/health/ready`.
+3. **Vercel**: importar el repositorio con **Root Directory = `frontend`** (Framework: Next.js) y
+   definir las variables:
+   - `API_INTERNAL_URL` = `https://<servicio>.onrender.com`
+   - `PROXY_SHARED_SECRET` = el mismo valor que generó Render (Render → servicio → Environment).
+4. Opcional: dominio propio en Vercel (por ejemplo un subdominio de tu sitio).
+
+Importar un log grande directo a la API (sin el límite de Vercel), con una API key creada desde la
+web:
+
+```bash
+curl -H "Authorization: Bearer wfa_TU_API_KEY" -F "file=@WoWCombatLog.txt" https://<servicio>.onrender.com/api/v1/reports/import
+```
 
 ## Checklist antes de publicar
 

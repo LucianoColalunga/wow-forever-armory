@@ -13,6 +13,7 @@ from app.importer.validation import InvalidUpload
 from app.models import Fight, ImportJob, Report, ReportIssue, SourceFile
 from app.schemas import ImportAccepted
 from app.services.queries import count_of, data_meta, fight_summary, paged, visible_report
+from app.worker.queue import notify_new_job
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -177,4 +178,5 @@ def import_report(
     )
     if outcome.duplicate:
         return JSONResponse(body.model_dump(), status_code=200)
+    notify_new_job()
     return body

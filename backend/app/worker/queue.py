@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import socket
+import threading
 import traceback
 from datetime import UTC, datetime, timedelta
 
@@ -25,6 +26,14 @@ from app.models import ImportJob, Report, WorkerHeartbeat
 log = logging.getLogger("wfa.worker")
 
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"[:64]
+
+# Con INLINE_WORKER el worker corre dentro de la API: se lo despierta al encolar un trabajo para
+# poder sondear la base con poca frecuencia (en planes gratis, una base que nunca duerme agota la cuota).
+inline_wakeup = threading.Event()
+
+
+def notify_new_job() -> None:
+    inline_wakeup.set()
 
 
 def _now() -> datetime:
