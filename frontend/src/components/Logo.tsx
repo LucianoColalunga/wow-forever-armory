@@ -1,6 +1,6 @@
 /**
- * Sello propio de estética helada: anillo de escarcha, esquirlas de hielo y una corona rúnica.
- * Diseño original (no usa logos ni arte de Blizzard ni de terceros).
+ * Espada rúnica helada, inspirada en la estética de Rasganorte (WotLK).
+ * Diseño original dibujado a mano (no usa logos ni arte de Blizzard ni de terceros).
  */
 export function Logo({ size = 36 }: { size?: number }) {
   return (
@@ -11,46 +11,57 @@ export function Logo({ size = 36 }: { size?: number }) {
           <stop offset="0.5" stopColor="#6cc4f5" />
           <stop offset="1" stopColor="#2a6fb5" />
         </linearGradient>
-        <linearGradient id="wfa-ice" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#f2fbff" />
-          <stop offset="0.45" stopColor="#8fd6ff" />
-          <stop offset="1" stopColor="#2a6fb5" />
+        <linearGradient id="wfa-blade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#5fb6ea" />
+          <stop offset="0.5" stopColor="#f2fbff" />
+          <stop offset="1" stopColor="#3d86c6" />
         </linearGradient>
-        <radialGradient id="wfa-glow" cx="0.5" cy="0.45" r="0.5">
-          <stop offset="0" stopColor="#7fd3ff" stopOpacity="0.35" />
+        <linearGradient id="wfa-steel" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#c9d6e3" />
+          <stop offset="1" stopColor="#5b6b80" />
+        </linearGradient>
+        <radialGradient id="wfa-glow" cx="0.5" cy="0.55" r="0.5">
+          <stop offset="0" stopColor="#7fd3ff" stopOpacity="0.4" />
           <stop offset="1" stopColor="#7fd3ff" stopOpacity="0" />
         </radialGradient>
       </defs>
       <circle cx="32" cy="32" r="30" fill="#0b1220" />
-      <circle cx="32" cy="32" r="26" fill="url(#wfa-glow)" />
+      <circle cx="32" cy="34" r="26" fill="url(#wfa-glow)" />
       <circle cx="32" cy="32" r="28" fill="none" stroke="url(#wfa-ring)" strokeWidth="2.5" />
-      <circle cx="32" cy="32" r="23" fill="none" stroke="#8fd6ff" strokeWidth="0.8" strokeDasharray="2 4" opacity="0.6" />
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
-        <path key={a} d="M32 1.5 L34 6 L32 10 L30 6 Z" fill="#cdefff" transform={`rotate(${a} 32 32)`} opacity="0.9" />
-      ))}
-      {/* Corona de hielo */}
+      {/* Hoja dentada */}
       <path
-        d="M16 41 L19.5 22 L25.5 31 L32 12 L38.5 31 L44.5 22 L48 41 Z"
-        fill="url(#wfa-ice)"
+        d="M26.5 27 L37.5 27 L36 34 L38.5 39 L35.8 45 L37 49.5 L32 60 L27 49.5 L28.2 45 L25.5 39 L28 34 Z"
+        fill="url(#wfa-blade)"
         stroke="#e6f8ff"
-        strokeWidth="0.8"
+        strokeWidth="0.7"
         strokeLinejoin="round"
       />
-      <rect x="16" y="40" width="32" height="6" rx="1" fill="#17406f" stroke="#9fe3ff" strokeWidth="0.8" />
-      {[24, 32, 40].map((x) => (
-        <path key={x} d={`M${x} 41.2 L${x + 1.8} 43 L${x} 44.8 L${x - 1.8} 43 Z`} fill="#c8f3ff" />
-      ))}
-      {/* Runa central */}
+      <path d="M32 29 V55" stroke="#2a6fb5" strokeWidth="1" opacity="0.7" />
+      {/* Runas en la hoja */}
       <path
-        d="M32 21 V33 M32 26 L28.5 22.5 M32 26 L35.5 22.5 M29.5 33 H34.5"
+        d="M30.3 33 L32 35 L33.7 33 M30.3 39.5 H33.7 M31 42 L33 44 M33 42 L31 44 M30.6 48 L32 50 L33.4 48"
         stroke="#ffffff"
-        strokeWidth="1.3"
+        strokeWidth="0.9"
         strokeLinecap="round"
         fill="none"
         opacity="0.95"
       />
-      {/* Carámbanos */}
-      <path d="M20 46 L21.5 51 L23 46 Z M28 46 L29.2 52.5 L30.4 46 Z M35.5 46 L36.8 51.5 L38 46 Z M42 46 L43.2 50 L44.4 46 Z" fill="#9fe3ff" opacity="0.85" />
+      {/* Guarda con cuernos */}
+      <path
+        d="M14 17 Q18 25 26 24 L32 28.5 L38 24 Q46 25 50 17 Q47 28 38.5 28.5 L32 31 L25.5 28.5 Q17 28 14 17 Z"
+        fill="url(#wfa-steel)"
+        stroke="#e6f0f8"
+        strokeWidth="0.7"
+        strokeLinejoin="round"
+      />
+      {/* Cráneo central */}
+      <path d="M28.5 21 Q28.5 16.5 32 16.5 Q35.5 16.5 35.5 21 L34.3 25 L29.7 25 Z" fill="#dfe8f0" stroke="#0b1220" strokeWidth="0.5" />
+      <circle cx="30.6" cy="21" r="1.1" fill="#7fe0ff" />
+      <circle cx="33.4" cy="21" r="1.1" fill="#7fe0ff" />
+      {/* Empuñadura y pomo */}
+      <rect x="30.6" y="8" width="2.8" height="8.5" rx="0.6" fill="#3a2f4a" stroke="#9fb3c8" strokeWidth="0.5" />
+      <path d="M30.6 10.5 L33.4 12 M30.6 13 L33.4 14.5" stroke="#9fb3c8" strokeWidth="0.5" />
+      <path d="M32 3 L34.6 6 L32 9 L29.4 6 Z" fill="#8fd6ff" stroke="#e6f8ff" strokeWidth="0.6" />
     </svg>
   );
 }
