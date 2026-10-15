@@ -126,7 +126,7 @@ def dungeon(dungeon_id: str, db: DB, dataset: Dataset = "real") -> dict[str, Any
     payload["runs"] = [fight_summary(f) for f in runs]
     payload["runs_note"] = (
         "Los recorridos se muestran como historial: no se rankean tiempos porque Blizzard no "
-        "publicó criterios de finalización ni hay Mythic+ en Forever."
+        "publicó criterios de finalización ni anunció Mythic+ para Forever."
     )
     return payload
 

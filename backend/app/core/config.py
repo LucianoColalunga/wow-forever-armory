@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 from functools import lru_cache
 from pathlib import Path
 
@@ -70,8 +71,16 @@ class Settings(BaseSettings):
         return self.app_env == "production"
 
     @property
-    def trusted_proxy_set(self) -> set[str]:
-        return {p.strip() for p in self.trusted_proxies.split(",") if p.strip()}
+    def trusted_proxy_networks(self) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        nets = []
+        for raw in self.trusted_proxies.split(","):
+            raw = raw.strip()
+            if raw:
+                try:
+                    nets.append(ipaddress.ip_network(raw, strict=False))
+                except ValueError:
+                    continue
+        return nets
 
     @property
     def cors_origin_list(self) -> list[str]:

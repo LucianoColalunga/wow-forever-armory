@@ -7,6 +7,7 @@ por Redis sin cambiar las dependencias de FastAPI que lo usan.
 
 from __future__ import annotations
 
+import ipaddress
 import threading
 import time
 from collections import deque
@@ -51,16 +52,27 @@ class SlidingWindowLimiter:
 limiter = SlidingWindowLimiter()
 
 
+def _trusted(ip: str, networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network]) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return any(addr in net for net in networks)
+
+
 def client_ip(request: Request) -> str:
-    """IP del cliente. Sólo se confía en X-Forwarded-For si el par inmediato es un proxy de confianza."""
+    """IP del cliente. Sólo se confía en X-Forwarded-For si el par inmediato es un proxy de confianza.
+
+    TRUSTED_PROXIES acepta IPs o rangos CIDR (p. ej. ``172.16.0.0/12`` para la red de Docker).
+    """
     peer = request.client.host if request.client else "unknown"
-    trusted = get_settings().trusted_proxy_set
-    if peer in trusted:
+    networks = get_settings().trusted_proxy_networks
+    if networks and _trusted(peer, networks):
         fwd = request.headers.get("x-forwarded-for", "")
         parts = [p.strip() for p in fwd.split(",") if p.strip()]
-        # Recorremos de derecha a izquierda descartando proxies de confianza.
+        # De derecha a izquierda, descartando proxies de confianza: el primero que no lo es es el cliente.
         for ip in reversed(parts):
-            if ip not in trusted:
+            if not _trusted(ip, networks):
                 return ip[:64]
     return peer[:64]
 

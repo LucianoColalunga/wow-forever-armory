@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Identidad visual propia: obsidiana, brasa dorada y arcano verde azulado. */
+@theme {
+  --color-bg: #0b0a0f;
+  --color-surface: #14121b;
+  --color-surface-2: #1c1926;
+  --color-surface-3: #262133;
+  --color-line: #332c42;
+  --color-ink: #ece6d9;
+  --color-muted: #b0a796;
+  --color-faint: #8a8174;
+  --color-gold: #d8b25a;
+  --color-gold-strong: #f0c870;
+  --color-ember: #c8643c;
+  --color-arcane: #59c3b6;
+  --color-danger: #ef7b6c;
+  --color-warning: #e8b04f;
+  --color-success: #7cc892;
+  --color-demo: #c3a1ef;
+
+  --font-display: var(--font-cinzel), "Times New Roman", serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  background-image:
+    radial-gradient(1200px 500px at 15% -10%, rgb(216 178 90 / 0.08), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgb(89 195 182 / 0.06), transparent 60%);
+
+  font-feature-settings: "tnum" 1;
+}
+
+/* Foco siempre visible para navegación por teclado */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-gold-strong);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0.5rem;
+  z-index: 100;
+}
+.skip-link:focus {
+  left: 0.5rem;
+}
+
+.card {
+  background: linear-gradient(180deg, rgb(28 25 38 / 0.92), rgb(20 18 27 / 0.92));
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+}
+
+.rune-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+  opacity: 0.45;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

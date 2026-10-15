@@ -213,7 +213,7 @@ def _boss_fight(
         sig = SIGNATURE.get((p.class_slug, p.spec))
         if sig:
             b.cast(p.unit, None, sig[1], sig[0])
-    step_ms = 3000
+    step_ms = 2500  # divide el balde de 5 s: evita un patrón de serrucho en la línea de tiempo
     for t in range(0, duration * 1000, step_ms):
         b.wait(step_ms)
         # el jefe golpea a un tanque y a veces a un jugador al azar
@@ -387,7 +387,11 @@ def battleground(world: DemoWorld, start: datetime, seed: int) -> str:
 def generate(start: datetime | None = None, weeks: int = 6) -> list[tuple[str, str, dict[str, str]]]:
     """Devuelve [(nombre_archivo, texto, metadatos_de_importación)]."""
     world = DemoWorld()
-    base = start or datetime(2026, 9, 17, 21, 0)
+    if start is None:
+        # Termina cerca de hoy para que la demo luzca "fresca"; el contenido es determinista.
+        today = datetime.now().replace(hour=21, minute=0, second=0, microsecond=0)
+        start = today - timedelta(days=7 * weeks + 1)
+    base = start
     files: list[tuple[str, str, dict[str, str]]] = []
     for week in range(weeks):
         for gi, (guild, realm) in enumerate(GUILDS):

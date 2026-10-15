@@ -40,3 +40,5 @@ frontend/next-env.d.ts
 Thumbs.db
 .idea/
 .vscode/
+
+backend/storage-e2e/

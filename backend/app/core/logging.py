@@ -24,10 +24,11 @@ _SECRET_PATTERNS = [
 
 
 def redact(text: str) -> str:
-    text = _SECRET_PATTERNS[0].sub(lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]", text)
-    text = _SECRET_PATTERNS[1].sub("wfa_[REDACTED]", text)
+    # Orden: primero los formatos específicos (Bearer, API keys, URLs), después clave=valor genérico.
     text = _SECRET_PATTERNS[2].sub("Bearer [REDACTED]", text)
+    text = _SECRET_PATTERNS[1].sub("wfa_[REDACTED]", text)
     text = _SECRET_PATTERNS[3].sub(lambda m: f"{m.group(1)}[REDACTED]{m.group(3)}", text)
+    text = _SECRET_PATTERNS[0].sub(lambda m: f"{m.group(1)}{m.group(2)}[REDACTED]", text)
     return text
 
 
