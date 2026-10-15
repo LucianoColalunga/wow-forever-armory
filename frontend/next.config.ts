@@ -22,6 +22,10 @@ const securityHeaders = [
   },
 ];
 
+// Dominio principal en producción (p. ej. wowforeverarmory.com.ar). Si está definido, en el deploy de
+// producción de Vercel cualquier otro host (como <proyecto>.vercel.app) redirige a este.
+const canonicalHost = process.env.CANONICAL_HOST?.trim().toLowerCase();
+
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
@@ -39,6 +43,16 @@ const nextConfig: NextConfig = {
         destination: "https://:domain/:path*",
         permanent: true,
       },
+      ...(canonicalHost && process.env.VERCEL_ENV === "production"
+        ? [
+            {
+              source: "/:path*",
+              missing: [{ type: "host" as const, value: canonicalHost.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") }],
+              destination: `https://${canonicalHost}/:path*`,
+              permanent: true,
+            },
+          ]
+        : []),
     ];
   },
 };

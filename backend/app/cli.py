@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.core.security import hash_password, validate_password_strength
 from app.db.session import get_sessionmaker
 from app.models import Character, Encounter, Guild, Report, SourceFile, User
+from app.parser import PARSER_VERSION
 from app.rankings import cache
 from app.services.catalog import sync_catalog
 
@@ -93,8 +94,16 @@ def _seed_demo(args: argparse.Namespace) -> int:
         sync_catalog(db)
         existing = db.scalar(select(func.count()).select_from(Report).where(Report.dataset == "demo"))
     if existing and not args.force:
-        print(f"Ya hay {existing} reportes DEMO. Usá --force para regenerarlos.")
-        return 0
+        with get_sessionmaker()() as db:
+            outdated = db.scalar(
+                select(func.count())
+                .select_from(Report)
+                .where(Report.dataset == "demo", Report.parser_version != PARSER_VERSION)
+            )
+        if not (args.refresh_outdated and outdated):
+            print(f"Ya hay {existing} reportes DEMO. Usá --force para regenerarlos.")
+            return 0
+        print(f"{outdated} reportes DEMO con otra versión del parser: se regeneran.")
     if existing:
         _reset_demo()
     files = generate(weeks=args.weeks)
@@ -158,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("seed-demo")
     p.add_argument("--force", action="store_true")
     p.add_argument("--weeks", type=int, default=6)
+    p.add_argument("--refresh-outdated", action="store_true", help="regenera si el parser cambió de versión")
     p.set_defaults(fn=_seed_demo)
     sub.add_parser("reset-demo").set_defaults(fn=_reset_demo)
     sub.add_parser("process-pending").set_defaults(fn=_process_pending)

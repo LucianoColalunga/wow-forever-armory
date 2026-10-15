@@ -122,11 +122,10 @@ class LogBuilder:
     ) -> LogBuilder:
         return self.emit("ENCOUNTER_END", enc_id, f'"{name}"', difficulty, size, 1 if success else 0, fight_ms)
 
-    def combatant_info(self, p: Unit, faction: int, spec_id: int) -> LogBuilder:
+    def combatant_info(self, p: Unit, faction: int, spec_id: int, gear: str | None = None) -> LogBuilder:
         stats = ["300", "100", "400", "50"] + ["0"] * 16 + ["3000"]
-        return self.emit(
-            "COMBATANT_INFO", p.guid, faction, *stats, spec_id, "[(1,2,3)]", "(0,0,0,0)", "[(19019,63,(),(),())]", "[]"
-        )
+        items = gear or "[(19019,63,(),(),())]"
+        return self.emit("COMBATANT_INFO", p.guid, faction, *stats, spec_id, "[(1,2,3)]", "(0,0,0,0)", items, "[]")
 
     def cast(self, src: Unit, dst: Unit | None, spell_id: int, spell: str, school: str = "0x1") -> LogBuilder:
         d = dst.fields() if dst else NIL_UNIT

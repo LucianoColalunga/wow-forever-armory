@@ -10,14 +10,17 @@ import type { FightDetail, Participant } from "@/lib/types";
 import { CombatTimeline, HBarChart } from "../Charts";
 import { type Column, DataTable } from "../DataTable";
 import { ClassName } from "../ui";
+import { PlayerLoadout } from "./PlayerLoadout";
 
-type Tab = "damage" | "healing" | "taken" | "utility";
+type MetricTab = "damage" | "healing" | "taken" | "utility";
+type Tab = MetricTab | "loadout";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "damage", label: "Daño" },
   { key: "healing", label: "Curación y absorciones" },
   { key: "taken", label: "Daño recibido y muertes" },
   { key: "utility", label: "Interrupciones y dispels" },
+  { key: "loadout", label: "Equipo y línea de tiempo" },
 ];
 
 function num(key: keyof Participant, label: string, fmt: (v: number) => string, title?: string): Column<Participant> {
@@ -33,6 +36,9 @@ function num(key: keyof Participant, label: string, fmt: (v: number) => string, 
 
 export function FightView({ fight }: { fight: FightDetail }) {
   const [tab, setTab] = useState<Tab>("damage");
+  const [selected, setSelected] = useState<number>(
+    () => (fight.participants.find((p) => p.gear?.length) ?? fight.participants[0])?.character_id ?? 0,
+  );
   const isPvp = fight.kind === "battleground";
   const base: Column<Participant>[] = [
     {
@@ -52,7 +58,7 @@ export function FightView({ fight }: { fight: FightDetail }) {
       ),
     },
   ];
-  const sets: Record<Tab, Column<Participant>[]> = {
+  const sets: Record<MetricTab, Column<Participant>[]> = {
     damage: [
       num("dps", "DPS", fmtDec, "Daño realizado / duración"),
       num("damage_done", "Daño realizado", fmtInt, "Vida quitada + overkill + absorbido por escudos del objetivo"),
@@ -84,7 +90,8 @@ export function FightView({ fight }: { fight: FightDetail }) {
     ],
     utility: [num("interrupts", "Interrupciones", fmtInt), num("dispels", "Dispels", fmtInt)],
   };
-  const sortKey = { damage: "dps", healing: "hps", taken: "damage_taken", utility: "interrupts" }[tab];
+  const metricTab: MetricTab = tab === "loadout" ? "damage" : tab;
+  const sortKey = { damage: "dps", healing: "hps", taken: "damage_taken", utility: "interrupts" }[metricTab];
   const barMetric = sortKey as keyof Participant;
   const bars = useMemo(
     () =>
@@ -114,10 +121,36 @@ export function FightView({ fight }: { fight: FightDetail }) {
           </button>
         ))}
       </div>
+      {tab === "loadout" ? (
+        <div role="tabpanel" className="card space-y-4 p-4">
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Jugador</span>
+            <select
+              value={selected}
+              onChange={(e) => setSelected(Number(e.target.value))}
+              className="rounded-md border border-line bg-surface px-2 py-1"
+            >
+              {[...fight.participants]
+                .sort((a, b) => a.name.localeCompare(b.name, "es"))
+                .map((p) => (
+                  <option key={p.character_id} value={p.character_id}>
+                    {p.name} ({classLabel(p.class_slug)})
+                  </option>
+                ))}
+            </select>
+          </label>
+          {(() => {
+            const part = fight.participants.find((p) => p.character_id === selected);
+            return part ? (
+              <PlayerLoadout participant={part} durationMs={fight.duration_ms} isDemo={fight.dataset === "demo"} />
+            ) : null;
+          })()}
+        </div>
+      ) : (
       <div role="tabpanel" className="space-y-4">
         <DataTable
           key={tab}
-          columns={[...base, ...sets[tab]]}
+          columns={[...base, ...sets[metricTab]]}
           rows={fight.participants}
           rowKey={(p) => p.character_id}
           caption={`Participantes: ${TABS.find((t) => t.key === tab)?.label}`}
@@ -127,7 +160,7 @@ export function FightView({ fight }: { fight: FightDetail }) {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="card p-4">
             <HBarChart
-              title={`${TABS.find((t) => t.key === tab)?.label}: ${sortKey.toUpperCase()} por jugador`}
+              title={`${TABS.find((t) => t.key === metricTab)?.label}: ${sortKey.toUpperCase()} por jugador`}
               data={bars}
               valueFormat={(v) => (["dps", "hps", "aps"].includes(sortKey) ? fmtDec(v) : fmtCompact(v))}
             />
@@ -145,6 +178,7 @@ export function FightView({ fight }: { fight: FightDetail }) {
           )}
         </div>
       </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="card p-4" aria-labelledby="deaths-title">
           <h2 id="deaths-title" className="mb-2 font-display text-lg">

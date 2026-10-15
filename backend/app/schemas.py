@@ -114,6 +114,11 @@ class ParticipantOut(BaseModel):
     survival_pct: float
     abilities: dict[str, Any] | None = None
     death_log: list[Any] | None = None
+    avg_item_level: float | None = Field(default=None, description="Nivel de objeto promedio equipado")
+    gear: list[Any] | None = Field(default=None, description="Objetos equipados al empezar el encuentro")
+    casts: dict[str, Any] | None = Field(
+        default=None, description="Línea de tiempo: spells (nombres), t (ms) y s (índice del hechizo)"
+    )
 
 
 class FightSummary(BaseModel):

@@ -10,6 +10,7 @@ from datetime import datetime
 import pytest
 
 from app.demo.logbuilder import LogBuilder, creature, player
+from app.parser.parser import PARSER_VERSION
 from tests.conftest import LOGS
 
 pytestmark = pytest.mark.integration
@@ -28,7 +29,7 @@ def test_import_basic_kill_end_to_end(client, make_user, upload, drain) -> None:
     rid = _import(upload, drain, "basic_kill.txt", u["headers"], guild_name="Prueba", guild_realm="Testrealm")
     rep = client.get(f"/api/v1/reports/{rid}").json()
     assert rep["status"] == "processed"
-    assert rep["parser_version"] == "1.0.0"
+    assert rep["parser_version"] == PARSER_VERSION
     assert rep["dialect"]["key"] == "forever"
     assert rep["source_file"]["original_name"] == "basic_kill.txt"
     assert len(rep["source_file"]["sha256"]) == 64

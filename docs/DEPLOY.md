@@ -78,7 +78,11 @@ Consecuencias del plan gratis:
    definir las variables:
    - `API_INTERNAL_URL` = `https://<servicio>.onrender.com`
    - `PROXY_SHARED_SECRET` = el mismo valor que generó Render (Render → servicio → Environment).
-4. Opcional: dominio propio en Vercel (por ejemplo un subdominio de tu sitio).
+4. Opcional: dominio propio. En Vercel → Settings → Domains agregá `tudominio` y `www.tudominio`;
+   en el registrador (por ejemplo NIC Argentina → Delegar) cargá `ns1.vercel-dns.com` y
+   `ns2.vercel-dns.com`. Cuando el dominio responda, definí `CANONICAL_HOST` = `tudominio` (sin
+   `https://`) en las variables de Vercel y volvé a desplegar: `www` y la dirección `*.vercel.app`
+   redirigen al dominio principal.
 
 Importar un log grande directo a la API (sin el límite de Vercel), con una API key creada desde la
 web:

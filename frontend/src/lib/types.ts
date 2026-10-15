@@ -120,6 +120,26 @@ export interface Participant {
   survival_pct: number;
   abilities?: { damage: { name: string; amount: number }[]; healing: { name: string; amount: number }[] } | null;
   death_log?: { t_ms: number; ability: string | null; killer: string | null }[] | null;
+  avg_item_level?: number | null;
+  gear?: GearItem[] | null;
+  casts?: CastTimelineData | null;
+}
+
+export interface GearItem {
+  slot: number;
+  slot_name: string;
+  item_id: number;
+  item_level: number;
+  enchants: number[];
+  bonus_ids: number[];
+  gems: number[];
+}
+
+/** Línea de tiempo compacta: nombres de hechizos y, por lanzamiento, ms y el índice del hechizo. */
+export interface CastTimelineData {
+  spells: string[];
+  t: number[];
+  s: number[];
 }
 
 export interface Timeline {

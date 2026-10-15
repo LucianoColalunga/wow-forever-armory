@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { Card, DataBanners, ErrorState, PageHeader, StatCard } from "@/components/ui";
 import { BestTable, type BestRow, EvolutionChart, type EvolutionPoint, RecentFights } from "@/components/views/PlayerProfileView";
+import { ProfileLoadout } from "@/components/views/ProfileLoadout";
 import { ApiError, apiGet } from "@/lib/api";
 import { CLASS_SOURCE_LABELS, classColor, classLabel, specLabel } from "@/lib/classes";
 import { getDataset } from "@/lib/dataset";
@@ -82,6 +83,9 @@ export default async function PlayerPage({
       </p>
       <Card title="Mejores marcas por jefe" className="mt-4">
         <BestTable rows={p.best_by_encounter} />
+      </Card>
+      <Card title="Equipo y línea de tiempo por pelea" className="mt-4">
+        <ProfileLoadout characterId={c.id} fights={p.recent_fights} dataset={dataset} />
       </Card>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card title="Evolución histórica">

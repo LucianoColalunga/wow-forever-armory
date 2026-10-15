@@ -344,6 +344,8 @@ class FightParticipant(Base):
     survival_pct: Mapped[float] = mapped_column(Float, default=100.0)
     abilities: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     death_log: Mapped[list[Any] | None] = mapped_column(JSONB)
+    gear: Mapped[list[Any] | None] = mapped_column(JSONB)  # objetos equipados (COMBATANT_INFO)
+    casts: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # línea de tiempo de lanzamientos
     fight: Mapped[Fight] = relationship()
     character: Mapped[Character] = relationship()
 

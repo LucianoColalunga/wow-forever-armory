@@ -11,6 +11,7 @@ from sqlalchemy.sql import ColumnElement
 
 from app.core.config import get_settings
 from app.models import Character, Encounter, Fight, FightParticipant, Guild, Instance, Report, ReportIssue, SourceFile
+from app.parser.gear import average_item_level
 from app.rankings.cache import current_version
 
 
@@ -135,9 +136,12 @@ def participant_dict(p: FightParticipant, c: Character, include_details: bool = 
     }
     for k in PARTICIPANT_FIELDS:
         out[k] = getattr(p, k)
+    out["avg_item_level"] = average_item_level(p.gear)
     if include_details:
         out["abilities"] = p.abilities
         out["death_log"] = p.death_log
+        out["gear"] = p.gear
+        out["casts"] = p.casts
     return out
 
 

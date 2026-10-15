@@ -88,8 +88,18 @@ porcentaje de líneas ilegibles, log sin huso horario o sin año (se infiere con
 sin Advanced Combat Logging, overhealing mayor que la curación, absorciones inconsistentes y
 **outliers** (DPS > 3× el máximo histórico del jefe con ≥10 registros → queda en revisión admin).
 
+## Equipo y línea de tiempo
+
+- **Equipo**: se toma del `COMBATANT_INFO` que el cliente escribe al empezar cada jefe con Advanced
+  Combat Logging. Se guarda por ranura el ID de objeto, el nivel de objeto, encantamientos, bonus y
+  gemas. El nivel promedio excluye camisa y tabardo. El log no trae nombres ni apariencia: la
+  interfaz muestra una silueta propia y enlaza cada objeto a Wowhead (en datos reales).
+- **Línea de tiempo**: cada `SPELL_CAST_SUCCESS` del jugador dentro del combate, con el momento
+  relativo al inicio (máximo 1500 por jugador y pelea). Los hechizos que se lanzan sin
+  `SPELL_CAST_SUCCESS` (por ejemplo, ataques automáticos) no aparecen.
+
 ## Parser versionado
 
-`PARSER_VERSION` (hoy `1.0.0`) se guarda en cada reporte y combate. Cambiar reglas implica subir la
+`PARSER_VERSION` (hoy `1.1.0`) se guarda en cada reporte y combate. Cambiar reglas implica subir la
 versión y reprocesar (`python -m app.cli reprocess-all`). El tamaño del bloque avanzado se calibra
 por archivo con `SPELL_CAST_SUCCESS`, así el parser tolera cambios de formato entre clientes.

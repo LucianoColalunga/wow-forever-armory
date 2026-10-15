@@ -1002,6 +1002,75 @@
         }
       }
     },
+    "/api/v1/players/{player_id}/encounters/{fight_id}": {
+      "get": {
+        "tags": [
+          "players"
+        ],
+        "summary": "Un combate del personaje: rendimiento, equipo y línea de tiempo de lanzamientos",
+        "operationId": "player_encounter_api_v1_players__player_id__encounters__fight_id__get",
+        "parameters": [
+          {
+            "name": "player_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Player Id"
+            }
+          },
+          {
+            "name": "fight_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Fight Id"
+            }
+          },
+          {
+            "name": "dataset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "real",
+                "demo"
+              ],
+              "type": "string",
+              "description": "Conjunto de datos: `real` (por defecto) o `demo` (fixtures sintéticos). Nunca se mezclan.",
+              "default": "real",
+              "title": "Dataset"
+            },
+            "description": "Conjunto de datos: `real` (por defecto) o `demo` (fixtures sintéticos). Nunca se mezclan."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Player Encounter Api V1 Players  Player Id  Encounters  Fight Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/players/{player_id}/fights": {
       "get": {
         "tags": [
@@ -4693,6 +4762,44 @@
               }
             ],
             "title": "Death Log"
+          },
+          "avg_item_level": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Item Level",
+            "description": "Nivel de objeto promedio equipado"
+          },
+          "gear": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gear",
+            "description": "Objetos equipados al empezar el encuentro"
+          },
+          "casts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Casts",
+            "description": "Línea de tiempo: spells (nombres), t (ms) y s (índice del hechizo)"
           }
         },
         "type": "object",

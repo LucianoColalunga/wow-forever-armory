@@ -8,7 +8,7 @@
  * azul y no lleva leyenda (el título la nombra).
  */
 
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useId, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -19,10 +19,14 @@ import {
   Line,
   LineChart,
   ResponsiveContainer,
+  Scatter,
+  ScatterChart,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+
+import type { CastTimelineData } from "@/lib/types";
 
 export const SERIES_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500"] as const;
 const GRID = "#332c42";
@@ -283,6 +287,84 @@ export function ColumnChart({
           <Tooltip {...tooltipStyle} formatter={(v) => [fmt(Number(v)), valueLabel]} />
           <Bar dataKey="value" fill={SERIES_COLORS[0]} radius={[4, 4, 0, 0]} isAnimationActive={false} />
         </BarChart>
+      </ResponsiveContainer>
+    </Figure>
+  );
+}
+
+const MAX_TIMELINE_ROWS = 14;
+
+function mmss(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Línea de tiempo de lanzamientos: una fila por hechizo y un punto por uso. */
+export function CastTimelineChart({
+  title,
+  description,
+  data,
+  durationMs,
+}: {
+  title: string;
+  description?: string;
+  data: CastTimelineData;
+  durationMs: number;
+}) {
+  const { categories, points, table } = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const idx of data.s) counts.set(idx, (counts.get(idx) ?? 0) + 1);
+    const order = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([i]) => i);
+    const top = order.slice(0, MAX_TIMELINE_ROWS);
+    const topSet = new Set(top);
+    const cats = top.map((i) => data.spells[i]);
+    if (order.length > MAX_TIMELINE_ROWS) cats.push("Otras");
+    const rank = new Map(cats.map((c, i) => [c, i]));
+    const pts = data.t
+      .map((t, k) => ({ x: t / 1000, y: topSet.has(data.s[k]) ? data.spells[data.s[k]] : "Otras", name: data.spells[data.s[k]] }))
+      .sort((a, b) => (rank.get(a.y) ?? 0) - (rank.get(b.y) ?? 0) || a.x - b.x);
+    const rows = order.map((i) => {
+      const times = data.t.filter((_, k) => data.s[k] === i);
+      return [data.spells[i], times.length, mmss(Math.min(...times) / 1000), mmss(Math.max(...times) / 1000)] as (string | number)[];
+    });
+    return { categories: cats, points: pts, table: rows };
+  }, [data]);
+  const height = Math.max(160, categories.length * 26 + 70);
+  return (
+    <Figure
+      title={title}
+      description={description}
+      table={{ headers: ["Hechizo", "Usos", "Primer uso", "Último uso"], rows: table }}
+      height={height}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <ScatterChart margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
+          <CartesianGrid stroke={GRID} />
+          <XAxis
+            type="number"
+            dataKey="x"
+            name="Tiempo"
+            domain={[0, Math.ceil(durationMs / 1000)]}
+            tickFormatter={(v) => mmss(Number(v))}
+            stroke={AXIS}
+            fontSize={11}
+          />
+          <YAxis type="category" dataKey="y" allowDuplicatedCategory={false} width={150} stroke={AXIS} fontSize={11} />
+          <Tooltip
+            {...tooltipStyle}
+            content={({ active, payload }) => {
+              const pt = active && payload?.[0] ? (payload[0].payload as { x: number; name: string }) : null;
+              return pt ? (
+                <div style={tooltipStyle.contentStyle}>
+                  <div style={{ padding: "4px 8px" }}>
+                    <strong>{pt.name}</strong> · {mmss(pt.x)}
+                  </div>
+                </div>
+              ) : null;
+            }}
+          />
+          <Scatter data={points} fill={SERIES_COLORS[0]} shape="circle" isAnimationActive={false} />
+        </ScatterChart>
       </ResponsiveContainer>
     </Figure>
   );

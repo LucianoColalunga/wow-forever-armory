@@ -21,6 +21,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from app.catalog.forever import classify_zone
 from app.parser import dialects
@@ -36,6 +37,7 @@ from app.parser.constants import (
     TYPE_MASK,
     TYPE_PLAYER,
 )
+from app.parser.gear import extract_items
 from app.parser.metrics import PlayerStats, Timeline
 from app.parser.tokenizer import (
     LineFormatError,
@@ -49,12 +51,13 @@ from app.parser.tokenizer import (
     tokenize,
 )
 
-PARSER_VERSION = "1.0.0"
+PARSER_VERSION = "1.1.0"  # 1.1: equipo por encuentro y línea de tiempo de lanzamientos
 
 TIMELINE_BUCKET_MS = 5000
 MIN_RANKABLE_DURATION_MS = 15_000
 MAX_LINE_LENGTH = 65_536
 MAX_STORED_ISSUES = 200
+MAX_CASTS_PER_PLAYER = 1500
 
 
 @dataclass(slots=True)
@@ -85,6 +88,7 @@ class UnitInfo:
     spec_id: int | None = None
     spell_casts: Counter[str] = field(default_factory=Counter)
     guess: ClassGuess | None = None
+    gear: list[dict[str, Any]] | None = None
 
 
 @dataclass(slots=True)
@@ -119,6 +123,9 @@ class FightResult:
     # campos derivados al cerrar
     duration_ms: int = 0
     fight_key: str = ""
+    # equipo informado por COMBATANT_INFO y lanzamientos (ms relativo, hechizo) por jugador
+    gear: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    casts: dict[str, list[tuple[int, str]]] = field(default_factory=dict)
 
     def stats_for(self, guid: str, name: str | None) -> PlayerStats:
         ps = self.players.get(guid)
@@ -558,6 +565,11 @@ class CombatLogParser:
                     self.feign_cast[src_guid] = ts
                 if self.encounter is not None and _reaction(src_flags) == REACTION_FRIENDLY:
                     self.encounter.roster.add(src_guid)
+                if suffix == "_CAST_SUCCESS":
+                    for seg in self._active():
+                        timeline = seg.casts.setdefault(src_guid, [])
+                        if len(timeline) < MAX_CASTS_PER_PLAYER:
+                            timeline.append((seg.rel_ms(ts), spell_name))
             return
 
         segs = self._active()
@@ -717,8 +729,13 @@ class CombatLogParser:
                 if sid in SPEC_IDS:
                     unit.spec_id = sid
                     break
+        items = extract_items(f)
+        if items is not None:
+            unit.gear = items
         if self.encounter is not None:
             self.encounter.roster.add(f[1])
+            if items is not None:
+                self.encounter.gear[f[1]] = items
 
     def _unit_died(self, raw: RawLine, ts: datetime, dst_guid: str, dst_name: str | None) -> None:
         f = raw.fields

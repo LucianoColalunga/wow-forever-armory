@@ -10,6 +10,8 @@ combat logs con parser propio.
 
 Autor: **Luciano Colalunga**.
 
+Sitio: **https://wowforeverarmory.com.ar** · API: `https://wow-forever-armory-api.onrender.com/api/docs`.
+
 ## Por qué funciona sin API oficial
 
 Al 14/10/2026 Blizzard no publicó ninguna API para Forever (ver [docs/RESEARCH.md](docs/RESEARCH.md)).
@@ -29,6 +31,7 @@ implementadas como adaptadores desactivados con su motivo documentado.
 | Perfiles | Personaje (mejores marcas, percentiles, evolución, historial) y hermandad (progreso, miembros, actividad) |
 | Buscador | Global, tolerante a errores de tipeo (PostgreSQL `pg_trgm`) |
 | Comparador | 2 a 4 personajes, sólo dentro del mismo jefe, dificultad y tamaño |
+| Equipo y lanzamientos | Por pelea: equipo de cada jugador (ranura, ID y nivel de objeto, encantamientos y gemas, según `COMBATANT_INFO`) y línea de tiempo de qué hechizo usó en cada momento (`SPELL_CAST_SUCCESS`) |
 | Historial | Kills, wipes (con % de vida del jefe), recorridos de mazmorra y partidas PvP |
 | Importador | Validación segura, deduplicación, cola con reintentos, parser versionado y reprocesable, trazabilidad hasta la línea del archivo |
 | Admin | Correcciones auditadas (clase/spec, hermandad, privacidad, exclusiones, outliers, verificación de instancias), usuarios, trabajos, aportes de usuarios |

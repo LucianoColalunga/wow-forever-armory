@@ -337,6 +337,23 @@ def _is_outlier(db: Session, fight: Fight, dps_values: list[float]) -> bool:
     return bool(count >= OUTLIER_MIN_SAMPLE and max_dps and max(dps_values) > OUTLIER_FACTOR * max_dps)
 
 
+def _compact_casts(casts: list[tuple[int, str]] | None) -> dict[str, Any] | None:
+    """Línea de tiempo compacta: lista de hechizos y, por lanzamiento, (ms, índice del hechizo)."""
+    if not casts:
+        return None
+    spells: list[str] = []
+    index: dict[str, int] = {}
+    t: list[int] = []
+    s: list[int] = []
+    for ms, name in casts:
+        if name not in index:
+            index[name] = len(spells)
+            spells.append(name)
+        t.append(ms)
+        s.append(index[name])
+    return {"spells": spells, "t": t, "s": s}
+
+
 def _abilities(counter: Any, limit: int = 12) -> list[dict[str, Any]]:
     return [{"name": k, "amount": int(v)} for k, v in counter.most_common(limit) if v > 0]
 
@@ -511,6 +528,8 @@ def _store_fight(
                 survival_pct=m["survival_pct"],
                 abilities={"damage": _abilities(ps.damage_by_ability), "healing": _abilities(ps.healing_by_ability)},
                 death_log=ps.death_log or None,
+                gear=fr.gear.get(guid),
+                casts=_compact_casts(fr.casts.get(guid)),
             )
         )
     if timeline is not None:

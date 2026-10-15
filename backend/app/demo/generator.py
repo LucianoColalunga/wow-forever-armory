@@ -11,10 +11,12 @@ sólo para poder navegar las páginas de instancia con datos de ejemplo.
 from __future__ import annotations
 
 import random
+import zlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.demo.logbuilder import LogBuilder, Unit, creature, player
+from app.parser.classes import SPEC_IDS
 
 DEMO_BUILD = "1.60.1-DEMO"
 
@@ -191,6 +193,50 @@ class DemoWorld:
         return DemoPlayer(u, cls, spec, role, spell, sid, school, base, skill=self.rng.uniform(0.78, 1.18))
 
 
+# specID de cada arquetipo (los mismos que usa COMBATANT_INFO).
+_SPEC_ID = {cs: sid for sid, cs in sorted(SPEC_IDS.items(), reverse=True)}
+_INTERRUPTS = {
+    "warrior": (6552, "Pummel"),
+    "rogue": (1766, "Kick"),
+    "mage": (2139, "Counterspell"),
+    "shaman": (8042, "Earth Shock"),
+}
+_EMPTY_SLOTS = {3, 18}  # camisa y tabardo vacíos
+# Hechizos secundarios por clase (para que la línea de tiempo de la demo tenga variedad).
+_SECONDARY: dict[str, list[tuple[str, int, str]]] = {
+    "warrior": [("Heroic Strike", 78, "0x1"), ("Whirlwind", 1680, "0x1")],
+    "rogue": [("Eviscerate", 2098, "0x1"), ("Rupture", 1943, "0x1")],
+    "mage": [("Fire Blast", 2136, "0x4"), ("Arcane Missiles", 5143, "0x40")],
+    "warlock": [("Immolate", 348, "0x4"), ("Curse of Agony", 980, "0x20")],
+    "hunter": [("Multi-Shot", 2643, "0x1"), ("Serpent Sting", 1978, "0x8")],
+    "priest": [("Mind Blast", 8092, "0x20"), ("Shadow Word: Pain", 589, "0x20")],
+    "druid": [("Moonfire", 8921, "0x40"), ("Wrath", 5176, "0x8")],
+    "shaman": [("Earth Shock", 8042, "0x8"), ("Lightning Bolt", 403, "0x8")],
+    "paladin": [("Judgement", 20271, "0x2"), ("Consecration", 26573, "0x2")],
+}
+_HEAL_SECONDARY: dict[str, list[tuple[str, int]]] = {
+    "priest": [("Renew", 139), ("Flash Heal", 2061)],
+    "paladin": [("Flash of Light", 19750)],
+    "druid": [("Regrowth", 8936), ("Healing Touch", 5185)],
+    "shaman": [("Healing Wave", 331), ("Lesser Healing Wave", 8004)],
+}
+
+
+def _demo_gear(p: DemoPlayer, week: int) -> str:
+    """19 ranuras con IDs de objeto ficticios (rango 9.100.000+) que mejoran semana a semana."""
+    base = 9_100_000 + (zlib.crc32(p.unit.guid.encode()) % 400) * 100  # estable entre ejecuciones
+    out = []
+    for slot in range(19):
+        if slot in _EMPTY_SLOTS:
+            out.append("(0,0,(),(),())")
+            continue
+        ilvl = 58 + 2 * week + (slot % 3)
+        enchant = 990_000 + slot if slot in (0, 2, 4, 6, 8, 9, 14, 15) else 0
+        gem = 991_000 + slot if slot in (0, 4) else 0
+        out.append(f"({base + slot * 10 + week},{ilvl},({enchant},0,0),(),({gem}))")
+    return "[" + ",".join(out) + "]"
+
+
 def _boss_fight(
     b: LogBuilder,
     rng: random.Random,
@@ -201,10 +247,14 @@ def _boss_fight(
     instance: int,
     kill: bool,
     week_factor: float,
+    week: int = 0,
 ) -> None:
     boss_unit = creature(boss.encounter_id, rng.randint(1, 9999), boss.name)
     duration = rng.randint(150, 240) if kill else rng.randint(60, 140)
     b.encounter_start(boss.encounter_id, boss.name, difficulty, size, instance)
+    for p in raid:
+        faction = 0 if "HordaDemo" in p.unit.name else 1
+        b.combatant_info(p.unit, faction, _SPEC_ID.get((p.class_slug, p.spec), 0), _demo_gear(p, week))
     hp = boss.hp
     tanks = [p for p in raid if p.role == "tank"] or raid[:1]
     healers = [p for p in raid if p.role == "healer"]
@@ -214,8 +264,14 @@ def _boss_fight(
         if sig:
             b.cast(p.unit, None, sig[1], sig[0])
     step_ms = 2500  # divide el balde de 5 s: evita un patrón de serrucho en la línea de tiempo
+    midway = (duration * 1000 // 2 // step_ms) * step_ms
     for t in range(0, duration * 1000, step_ms):
         b.wait(step_ms)
+        if t == midway:  # segundo uso del cooldown característico
+            for p in raid:
+                sig = SIGNATURE.get((p.class_slug, p.spec))
+                if sig and p.unit.guid not in dead:
+                    b.cast(p.unit, None, sig[1], sig[0])
         # el jefe golpea a un tanque y a veces a un jugador al azar
         tank = rng.choice(tanks)
         dmg = int(rng.uniform(1800, 3200))
@@ -250,40 +306,41 @@ def _boss_fight(
             per_tick = p.base * p.skill * week_factor * step_ms / 1000 * rng.uniform(0.75, 1.25)
             if p.role in ("dps", "tank"):
                 amount = int(per_tick)
+                spell, spell_id, school = (p.spell, p.spell_id, p.school)
+                if rng.random() > 0.6 and p.class_slug in _SECONDARY:
+                    spell, spell_id, school = rng.choice(_SECONDARY[p.class_slug])
+                b.cast(p.unit, boss_unit, spell_id, spell, school)
                 if hp - amount <= 0 and kill and t >= (duration - 6) * 1000:
                     b.spell_damage(
                         p.unit,
                         boss_unit,
-                        p.spell_id,
-                        p.spell,
+                        spell_id,
+                        spell,
                         amount,
                         overkill=amount - max(hp, 0),
-                        school=p.school,
+                        school=school,
                         hp=0,
                         max_hp=boss.hp,
                     )
                     hp = 0
                 else:
                     hp = max(1, hp - amount)
-                    b.spell_damage(
-                        p.unit, boss_unit, p.spell_id, p.spell, amount, school=p.school, hp=hp, max_hp=boss.hp
-                    )
-                if p.class_slug in ("warrior", "rogue", "mage", "shaman") and rng.random() < 0.04:
-                    b.interrupt(
-                        p.unit,
-                        boss_unit,
-                        6552,
-                        "Pummel" if p.class_slug == "warrior" else "Kick",
-                        990901,
-                        "Cántico Prohibido (demo)",
-                    )
+                    b.spell_damage(p.unit, boss_unit, spell_id, spell, amount, school=school, hp=hp, max_hp=boss.hp)
+                if p.class_slug in _INTERRUPTS and rng.random() < 0.04:
+                    kick_id, kick = _INTERRUPTS[p.class_slug]
+                    b.cast(p.unit, boss_unit, kick_id, kick)
+                    b.interrupt(p.unit, boss_unit, kick_id, kick, 990901, "Cántico Prohibido (demo)")
             else:
                 target = rng.choice(raid)
                 amount = int(per_tick * 1.2)
                 over = int(amount * rng.uniform(0.05, 0.45))
                 if p.spec == "discipline" and rng.random() < 0.5:
                     b.cast(p.unit, target.unit, 17, "Power Word: Shield", "0x2")
-                b.heal(p.unit, target.unit, p.spell_id, p.spell, amount, overheal=over)
+                heal, heal_id = (p.spell, p.spell_id)
+                if rng.random() > 0.6 and p.class_slug in _HEAL_SECONDARY:
+                    heal, heal_id = rng.choice(_HEAL_SECONDARY[p.class_slug])
+                b.cast(p.unit, target.unit, heal_id, heal, "0x2")
+                b.heal(p.unit, target.unit, heal_id, heal, amount, overheal=over)
                 if p.class_slug in ("priest", "paladin") and rng.random() < 0.05:
                     b.dispel(
                         p.unit,
@@ -317,9 +374,9 @@ def raid_night(world: DemoWorld, guild: str, raid_name: str, start: datetime, we
         wipes = rng.choice([0, 0, 1, 2]) if week < 3 else rng.choice([0, 0, 0, 1])
         for _ in range(wipes):
             b.wait(rng.randint(60_000, 180_000))
-            _boss_fight(b, rng, raid, boss, cfg["difficulty"], size, cfg["instance"], False, week_factor)  # type: ignore[arg-type]
+            _boss_fight(b, rng, raid, boss, cfg["difficulty"], size, cfg["instance"], False, week_factor, week)  # type: ignore[arg-type]
         b.wait(rng.randint(60_000, 240_000))
-        _boss_fight(b, rng, raid, boss, cfg["difficulty"], size, cfg["instance"], True, week_factor)  # type: ignore[arg-type]
+        _boss_fight(b, rng, raid, boss, cfg["difficulty"], size, cfg["instance"], True, week_factor, week)  # type: ignore[arg-type]
     return b.text()
 
 

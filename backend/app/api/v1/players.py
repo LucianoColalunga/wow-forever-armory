@@ -225,6 +225,29 @@ def get_player(player_id: int, db: DB, settings: SettingsDep, dataset: Dataset =
     }
 
 
+@router.get(
+    "/players/{player_id}/encounters/{fight_id}",
+    summary="Un combate del personaje: rendimiento, equipo y línea de tiempo de lanzamientos",
+)
+def player_encounter(player_id: int, fight_id: int, db: DB, dataset: Dataset = "real") -> dict[str, Any]:
+    c = _get_character(db, player_id, dataset)
+    row = db.execute(
+        select(FightParticipant, Fight)
+        .join(Fight, Fight.id == FightParticipant.fight_id)
+        .join(Report, Report.id == Fight.report_id)
+        .where(FightParticipant.character_id == c.id, Fight.id == fight_id, *visible_report())
+    ).first()
+    if row is None:
+        raise HTTPException(404, "El personaje no participó en ese combate.")
+    p, f = row
+    return {
+        "character": character_dict(c),
+        "fight": fight_summary(f),
+        "performance": participant_dict(p, c, include_details=True),
+        "meta": data_meta(db, dataset),
+    }
+
+
 @router.get("/players/{player_id}/fights", summary="Historial de combates del personaje")
 def player_fights(
     player_id: int,
