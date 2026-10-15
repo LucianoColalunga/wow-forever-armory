@@ -16,8 +16,8 @@ services:
         sync: false
       - key: ADMIN_BOOTSTRAP_EMAIL # email del primer admin
         sync: false
-      - key: ADMIN_BOOTSTRAP_PASSWORD # contraseña del primer admin (borrala después del primer arranque)
-        sync: false
+      - key: ADMIN_BOOTSTRAP_PASSWORD # la genera Render: se ve en Environment y es la del primer login
+        generateValue: true
       - key: PROXY_SHARED_SECRET # se genera solo; copiá el mismo valor en Vercel
         generateValue: true
       # Configuración

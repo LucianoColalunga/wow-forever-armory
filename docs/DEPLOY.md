@@ -69,10 +69,9 @@ Consecuencias del plan gratis:
 2. **Render** (render.com, entrar con GitHub): *New → Blueprint*, elegir este repositorio. Render lee
    `render.yaml` y pide:
    - `DATABASE_URL`: la cadena de Neon (se acepta tal cual, con `postgresql://`).
-   - `ADMIN_BOOTSTRAP_EMAIL` y `ADMIN_BOOTSTRAP_PASSWORD`: el primer admin (12+ caracteres con
-     mayúsculas, minúsculas y números). Después del primer arranque, borrá la contraseña de las
-     variables de Render.
-   - `PROXY_SHARED_SECRET` se genera solo.
+   - `ADMIN_BOOTSTRAP_EMAIL`: el email del primer admin.
+   - `ADMIN_BOOTSTRAP_PASSWORD` y `PROXY_SHARED_SECRET` se generan solos. La contraseña del admin se
+     ve en Render → servicio → *Environment*; usala para el primer ingreso.
    Al arrancar, `scripts/start.sh` aplica migraciones, sincroniza el catálogo, crea el admin y carga
    los datos DEMO. Verificá `https://<servicio>.onrender.com/api/health/ready`.
 3. **Vercel**: importar el repositorio con **Root Directory = `frontend`** (Framework: Next.js) y
