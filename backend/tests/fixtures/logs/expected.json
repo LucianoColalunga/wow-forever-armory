@@ -1,0 +1,89 @@
+{
+  "_comment": "Valores calculados a mano a partir de los eventos de cada archivo (ver README.md de esta carpeta). No se generan con el parser.",
+  "basic_kill.txt": {
+    "fights": [
+      {
+        "kind": "encounter",
+        "encounter_id": 99001,
+        "encounter_name": "Test Guardian",
+        "difficulty_id": 3,
+        "group_size": 20,
+        "success": true,
+        "complete": true,
+        "rankable": true,
+        "duration_ms": 60000,
+        "zone_name": "Hyjal Summit",
+        "boss_min_hp_pct": 0.0,
+        "players": {
+          "Player-5000-00000001": {
+            "name": "Brakka",
+            "damage_done": 5500, "effective_damage": 4000, "overkill": 1500, "damage_absorbed_by_target": 0,
+            "healing_gross": 0, "healing_effective": 0, "overhealing": 0, "heal_absorbed": 0,
+            "absorbs_provided": 0, "damage_taken": 3900, "damage_taken_absorbed": 1700,
+            "deaths": 0, "interrupts": 1, "dispels": 0, "dps": 91.67, "survival_pct": 100.0
+          },
+          "Player-5000-00000002": {
+            "name": "Lumen",
+            "damage_done": 0, "healing_gross": 5000, "healing_effective": 3500, "overhealing": 1500,
+            "heal_absorbed": 200, "absorbs_provided": 1700, "deaths": 0, "dispels": 1,
+            "hps": 58.33, "aps": 28.33
+          },
+          "Player-5000-00000003": {
+            "name": "Ignis",
+            "damage_done": 3300, "effective_damage": 2600, "overkill": 0, "damage_absorbed_by_target": 700,
+            "damage_taken": 5000, "deaths": 1, "time_alive_ms": 35100, "survival_pct": 58.5,
+            "healing_effective": 0, "absorbs_provided": 0
+          },
+          "Player-5000-00000004": {
+            "name": "Arrowyn",
+            "damage_done": 2200, "effective_damage": 2200, "deaths": 0
+          }
+        }
+      }
+    ],
+    "classes": {
+      "Player-5000-00000001": {"class": "warrior", "spec": "arms", "source": "combatant_info"},
+      "Player-5000-00000002": {"class": "priest", "spec": "holy", "source": "role"},
+      "Player-5000-00000003": {"class": "mage", "spec": "frost", "source": "signature"},
+      "Player-5000-00000004": {"class": "hunter", "spec": "marksmanship", "source": "signature"}
+    },
+    "raid_damage_total": 11000,
+    "dialect": {"key": "forever", "project_id": 18, "build_version": "1.60.1", "advanced_block": 17, "advanced_block_calibrated": true}
+  },
+  "wipe_then_kill.txt": {
+    "fights": [
+      {"success": false, "duration_ms": 30000, "boss_min_hp_pct": 40.0, "players": {"Player-5000-00000001": {"damage_done": 1000}}},
+      {"success": true, "duration_ms": 40000, "players": {"Player-5000-00000001": {"damage_done": 2000, "dps": 50.0}, "Player-5000-00000003": {"damage_done": 2000}}}
+    ]
+  },
+  "truncated.txt": {
+    "fights": [
+      {"complete": false, "rankable": false, "unrankable_reason": "incompleto", "duration_ms": 2000, "players": {"Player-5000-00000001": {"damage_done": 2000}}}
+    ],
+    "issue_codes": ["incomplete_fight"]
+  },
+  "legacy_no_year.txt": {
+    "fights": [
+      {"success": true, "duration_ms": 20000, "start_utc": "2026-12-31T23:59:50+00:00", "end_utc": "2027-01-01T00:00:10+00:00",
+       "players": {"Player-5000-00000001": {"damage_done": 2000}, "Player-5000-00000002": {"healing_effective": 800, "overhealing": 100}}}
+    ],
+    "issue_codes": ["year_inferred", "timezone_assumed", "advanced_logging_off"],
+    "dialect": {"key": "generic", "verified": false}
+  },
+  "battleground.txt": {
+    "fights": [
+      {"kind": "battleground", "zone_name": "Darkspear Islands", "duration_ms": 64100,
+       "players": {
+         "Player-5000-0000000A": {"name": "Aldren", "damage_done": 2700, "damage_to_players": 2700, "effective_damage": 2400, "overkill": 300, "killing_blows": 1},
+         "Player-5000-0000000B": {"name": "Marisol", "healing_gross": 700, "healing_effective": 600, "overhealing": 100, "damage_taken": 800},
+         "Player-5000-00000014": {"name": "Grosh", "damage_taken": 2700, "deaths": 1},
+         "Player-5000-00000015": {"name": "Zul'kah", "damage_done": 800, "damage_to_players": 800}
+       }}
+    ]
+  },
+  "quoted_names.txt": {
+    "fights": [
+      {"encounter_name": "Training, the Dummy", "players": {"Player-5000-0000000A": {"name": "Ca,ma", "damage_done": 700}}}
+    ]
+  }
+}

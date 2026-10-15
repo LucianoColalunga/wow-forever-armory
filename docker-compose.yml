@@ -1,0 +1,74 @@
+# Entorno completo: PostgreSQL + API (FastAPI) + worker de importación + web (Next.js).
+# Uso:  docker compose up --build      (ver README.md)
+name: wfa
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wfa}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wfa}
+      POSTGRES_DB: ${POSTGRES_DB:-wfa}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wfa} -d ${POSTGRES_DB:-wfa}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli sync-catalog && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-wfa}:${POSTGRES_PASSWORD:-wfa}@db:5432/${POSTGRES_DB:-wfa}
+      STORAGE_DIR: /data/storage
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health/ready').status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-wfa}:${POSTGRES_PASSWORD:-wfa}@db:5432/${POSTGRES_DB:-wfa}
+      STORAGE_DIR: /data/storage
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://api:8000
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  pgdata:
+  storage:

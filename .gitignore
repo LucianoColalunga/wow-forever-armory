@@ -1,0 +1,42 @@
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Datos locales (logs subidos, backups)
+backend/storage/
+storage/
+backups/
+*.dump
+
+# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/next-env.d.ts
+*.tsbuildinfo
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

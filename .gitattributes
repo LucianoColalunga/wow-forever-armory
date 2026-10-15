@@ -1,0 +1,7 @@
+# Finales de línea LF en el repo (Docker, CI y scripts corren en Linux).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.woff2 binary
