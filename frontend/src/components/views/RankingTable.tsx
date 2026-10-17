@@ -135,7 +135,7 @@ export function RankingTable({
       rows={rows}
       rowKey={(r) => r.character_id}
       caption={`Ranking por ${valueLabel}`}
-      filterText={(r) => `${r.name} ${r.guild_name ?? ""} ${classLabel(r.class_slug ?? r.character_class)}`}
+      filterText={kind === "pvp" ? undefined : (r) => `${r.name} ${r.guild_name ?? ""} ${classLabel(r.class_slug ?? r.character_class)}`}
       emptyMessage="Ningún personaje cumple los filtros y la muestra mínima."
     />
   );

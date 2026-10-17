@@ -88,7 +88,7 @@ export function FilterBar({ filters, resetKeys = [] }: { filters: FilterDef[]; r
 
   return (
     <form
-      className="card mb-4 grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-6"
+      className={`card mb-4 grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 ${filters.length > 6 ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}
       aria-label="Filtros"
       aria-busy={pending}
       onSubmit={(e) => e.preventDefault()}
