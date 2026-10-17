@@ -78,6 +78,13 @@ def client_ip(request: Request) -> str:
                 return forwarded_ip[:64]
             except ValueError:
                 pass
+    if settings.client_ip_header:
+        edge_ip = request.headers.get(settings.client_ip_header, "").strip()
+        try:
+            ipaddress.ip_address(edge_ip)
+            return edge_ip[:64]
+        except ValueError:
+            pass
     peer = request.client.host if request.client else "unknown"
     networks = settings.trusted_proxy_networks
     if networks and _trusted(peer, networks):

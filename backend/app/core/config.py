@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Secreto compartido con el proxy de Next.js (Vercel): permite confiar en la IP real del visitante
     # aunque el proxy no tenga IP fija. Vacío = desactivado.
     proxy_shared_secret: str | None = None
+    # Cabecera con la IP del visitante que escribe (y sobrescribe) el borde de la plataforma, p. ej.
+    # ``cf-connecting-ip`` en Render (Cloudflare). Sólo para plataformas donde el contenedor no es
+    # accesible sin pasar por ese borde. Vacío = desactivado.
+    client_ip_header: str = ""
     cors_origins: str = ""  # orígenes separados por coma (vacío = mismo origen vía proxy de Next.js)
     public_uploads: bool = False  # si es False, importar requiere usuario uploader/admin o API key
 

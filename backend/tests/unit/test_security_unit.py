@@ -49,6 +49,33 @@ def test_client_ip_from_proxy_with_shared_secret(monkeypatch: pytest.MonkeyPatch
     assert client_ip(_req_secret("10.1.2.3", "secreto-de-prueba", "198.51.100.7")) == "10.1.2.3"
 
 
+def test_client_ip_from_platform_edge_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(get_settings(), "trusted_proxies", "")
+    monkeypatch.setattr(get_settings(), "client_ip_header", "cf-connecting-ip")
+    req = Request(
+        {
+            "type": "http",
+            "client": ("10.9.8.7", 1),
+            "headers": [(b"cf-connecting-ip", b"198.51.100.7")],
+            "method": "GET",
+            "path": "/",
+        }
+    )
+    assert client_ip(req) == "198.51.100.7"
+    bad = Request(
+        {
+            "type": "http",
+            "client": ("10.9.8.7", 1),
+            "headers": [(b"cf-connecting-ip", b"x")],
+            "method": "GET",
+            "path": "/",
+        }
+    )
+    assert client_ip(bad) == "10.9.8.7"
+    monkeypatch.setattr(get_settings(), "client_ip_header", "")
+    assert client_ip(req) == "10.9.8.7"
+
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [

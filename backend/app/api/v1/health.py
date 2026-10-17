@@ -3,16 +3,22 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 
 from app import __version__
 from app.api.deps import DB, SettingsDep
+from app.core.ratelimit import client_ip
 from app.models import ImportJob, WorkerHeartbeat
 from app.parser import PARSER_VERSION
 
 router = APIRouter(prefix="/health", tags=["health"])
+
+
+@router.get("/ip", summary="IP con la que la API identifica al visitante (para verificar el rate limit)")
+def my_ip(request: Request) -> dict[str, str]:
+    return {"ip": client_ip(request)}
 
 
 @router.get("/live", summary="Liveness: el proceso responde")

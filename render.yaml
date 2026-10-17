@@ -18,6 +18,8 @@ services:
         sync: false
       - key: ADMIN_BOOTSTRAP_PASSWORD # la genera Render: se ve en Environment y es la del primer login
         generateValue: true
+      # CLIENT_IP_HEADER=cf-connecting-ip identifica a cada visitante detrás del borde de Render. Activarlo
+      # sólo después de verificar que no se puede falsificar (ver docs/SECURITY.md, "IP del visitante").
       - key: PROXY_SHARED_SECRET # se genera solo; copiá el mismo valor en Vercel
         generateValue: true
       # Configuración
