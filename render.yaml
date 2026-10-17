@@ -18,8 +18,8 @@ services:
         sync: false
       - key: ADMIN_BOOTSTRAP_PASSWORD # la genera Render: se ve en Environment y es la del primer login
         generateValue: true
-      # CLIENT_IP_HEADER=cf-connecting-ip identifica a cada visitante detrás del borde de Render. Activarlo
-      # sólo después de verificar que no se puede falsificar (ver docs/SECURITY.md, "IP del visitante").
+      - key: CLIENT_IP_HEADER # IP real del visitante detrás del borde de Render (Cloudflare). Verificado el
+        value: cf-connecting-ip # 17/10/2026: Cloudflare rechaza pedidos que traen esa cabecera (ver docs/SECURITY.md)
       - key: PROXY_SHARED_SECRET # se genera solo; copiá el mismo valor en Vercel
         generateValue: true
       # Configuración
