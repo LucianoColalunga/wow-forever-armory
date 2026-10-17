@@ -7,7 +7,7 @@ import { fmtDate, fmtDec, fmtMetric } from "@/lib/format";
 import type { RankingRow } from "@/lib/types";
 
 import { type Column, DataTable } from "../DataTable";
-import { ClassName } from "../ui";
+import { ClassName, FactionTag } from "../ui";
 
 export type RankingKind = "general" | "partition" | "pvp";
 
@@ -69,6 +69,14 @@ export function RankingTable({
       render: (r) => <span className="font-semibold text-gold-strong">{fmtValue(r.value)}</span>,
     },
   ];
+  if (kind === "pvp") {
+    columns.splice(3, 0, {
+      key: "faction",
+      label: "Facción",
+      sortValue: (r) => r.faction ?? "zz",
+      render: (r) => <FactionTag faction={r.faction} />,
+    });
+  }
   if (isPct && kind !== "general") {
     columns.push({
       key: "raw",

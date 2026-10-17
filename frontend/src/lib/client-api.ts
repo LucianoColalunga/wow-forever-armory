@@ -60,30 +60,77 @@ export async function clientSend<T>(method: "POST" | "PATCH" | "DELETE", path: s
   return parse<T>(res);
 }
 
-/** Subida con progreso (XMLHttpRequest permite medir bytes enviados). */
-export function uploadWithProgress(
-  form: FormData,
+interface UploadStarted {
+  upload_id: string;
+  chunk_size: number;
+  max_bytes: number;
+}
+
+function writeHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/json", ...extra };
+  const csrf = csrfToken();
+  if (csrf) headers["X-CSRF-Token"] = csrf;
+  return headers;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Sube un archivo por partes (la web en Vercel acepta como máximo 4,5 MB por pedido).
+ * Cada parte se reintenta ante cortes de red o errores 5xx; un 4xx corta la subida.
+ * Devuelve el estado y el cuerpo de la respuesta final de la API.
+ */
+export async function uploadInChunks(
+  file: Blob & { name: string },
+  fields: Record<string, string>,
   onProgress: (pct: number) => void,
+  { retries = 3, backoffMs = 800 }: { retries?: number; backoffMs?: number } = {},
 ): Promise<{ status: number; body: unknown }> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/v1/reports/import");
-    xhr.withCredentials = true;
-    const csrf = csrfToken();
-    if (csrf) xhr.setRequestHeader("X-CSRF-Token", csrf);
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-    };
-    xhr.onload = () => {
-      let body: unknown = null;
-      try {
-        body = JSON.parse(xhr.responseText);
-      } catch {
-        body = null;
+  const started = await clientSend<UploadStarted>("POST", "/reports/uploads", { file_name: file.name, size: file.size });
+  const base = `/api/v1/reports/uploads/${encodeURIComponent(started.upload_id)}`;
+  const parts = Math.max(1, Math.ceil(file.size / started.chunk_size));
+  try {
+    for (let i = 0; i < parts; i++) {
+      const chunk = file.slice(i * started.chunk_size, Math.min(file.size, (i + 1) * started.chunk_size));
+      for (let attempt = 0; ; attempt++) {
+        let res: Response | null = null;
+        try {
+          res = await fetch(`${base}/chunks/${i}`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: writeHeaders({ "Content-Type": "application/octet-stream" }),
+            body: chunk,
+          });
+        } catch {
+          res = null;
+        }
+        if (res?.ok) break;
+        if (res && res.status < 500 && res.status !== 429) await parse(res);
+        if (attempt >= retries) {
+          if (res) await parse(res);
+          throw new ClientApiError(0, "Se cortó la conexión durante la subida. Probá de nuevo.");
+        }
+        await sleep(backoffMs * (attempt + 1));
       }
-      resolve({ status: xhr.status, body });
-    };
-    xhr.onerror = () => reject(new ClientApiError(0, "No se pudo conectar con el servidor."));
-    xhr.send(form);
-  });
+      onProgress(Math.round(((i + 1) / parts) * 100));
+    }
+    const form = new URLSearchParams(fields);
+    const res = await fetch(`${base}/complete`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: writeHeaders({ "Content-Type": "application/x-www-form-urlencoded" }),
+      body: form,
+    });
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    return { status: res.status, body };
+  } catch (err) {
+    // Libera el espacio en el servidor; si falla, la sesión vence sola.
+    fetch(base, { method: "DELETE", credentials: "same-origin", headers: writeHeaders() }).catch(() => undefined);
+    throw err;
+  }
 }

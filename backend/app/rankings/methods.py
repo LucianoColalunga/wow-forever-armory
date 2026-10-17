@@ -138,6 +138,13 @@ class Filters:
     season_id: int | None = None
     date_from: datetime | None = None
     date_to: datetime | None = None
+    faction: str | None = None  # facción del personaje (cambia quiénes compiten)
+    name_query: str | None = None  # búsqueda por nombre: filtra filas pero conserva la posición real
+
+
+def _like_pattern(text: str) -> str:
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
 
 
 def _where(f: Filters, include_class: bool = True) -> list[ColumnElement[bool]]:
@@ -188,6 +195,7 @@ def _character_cols() -> list[Any]:
         Character.class_slug.label("character_class"),
         Character.spec.label("character_spec"),
         Character.dataset,
+        Character.faction,
         Guild.id.label("guild_id"),
         Guild.name.label("guild_name"),
     ]
@@ -382,16 +390,86 @@ def partition_ranking(
     else:
         raise ValueError("método inválido")
 
+    if f.faction:
+        q = q.where(Character.faction == f.faction)
     sub = q.subquery()
-    total = int(db.scalar(select(func.count()).select_from(sub)) or 0)
-    ordered = select(sub).order_by(sub.c.value.desc() if hb else sub.c.value.asc(), sub.c.occurred_at.asc())
-    rows = [dict(r) for r in db.execute(ordered.limit(page_size).offset((page - 1) * page_size)).mappings()]
-    offset = (page - 1) * page_size
-    for i, r in enumerate(rows):
-        r["rank"] = offset + i + 1
+    order = [sub.c.value.desc() if hb else sub.c.value.asc(), sub.c.occurred_at.asc(), sub.c.character_id.asc()]
+    # La posición se calcula sobre todo el ranking; la búsqueda por nombre sólo filtra qué filas se muestran.
+    ranked_all = select(sub, func.row_number().over(order_by=order).label("rank")).subquery()
+    shown = select(ranked_all)
+    if f.name_query:
+        shown = shown.where(ranked_all.c.name.ilike(_like_pattern(f.name_query), escape="\\"))
+    total = int(db.scalar(select(func.count()).select_from(shown.subquery())) or 0)
+    page_q = shown.order_by(ranked_all.c.rank).limit(page_size).offset((page - 1) * page_size)
+    rows = [dict(r) for r in db.execute(page_q).mappings()]
     meta = _meta(db, used_q)
     meta.update({"records_excluded": excluded, "higher_better": hb})
     return {"rows": rows, "total": total, "meta": meta}
+
+
+def spec_summary(db: Session, f: Filters, metric: str, min_players: int = 3) -> dict[str, Any]:
+    """Resumen de la partición por clase y spec, sin aplicar el filtro de clase.
+
+    Cada personaje cuenta una vez con su mejor valor; por spec se informa la mediana de esos mejores
+    valores y el máximo. Las specs con menos de ``min_players`` personajes se marcan como muestra chica.
+    """
+    spec = METRICS[metric]
+    hb: bool = spec["higher_better"]
+    best_fn = func.max if hb else func.min
+    base = select(
+        RankingEntry.character_id,
+        RankingEntry.fight_id,
+        RankingEntry.occurred_at,
+        RankingEntry.class_slug,
+        RankingEntry.spec,
+        cast(spec["column"], Float).label("value"),
+    ).where(*_where(f, include_class=False))
+    if f.faction:
+        base = base.join(Character, Character.id == RankingEntry.character_id).where(Character.faction == f.faction)
+    b = base.subquery()
+    matches, players, last_at = db.execute(
+        select(
+            func.count(func.distinct(b.c.fight_id)),
+            func.count(func.distinct(b.c.character_id)),
+            func.max(b.c.occurred_at),
+        )
+    ).one()
+    per_char = (
+        select(b.c.character_id, b.c.class_slug, b.c.spec, best_fn(b.c.value).label("best"))
+        .where(b.c.class_slug.is_not(None))
+        .group_by(b.c.character_id, b.c.class_slug, b.c.spec)
+        .subquery()
+    )
+    median = func.percentile_cont(0.5).within_group(per_char.c.best)
+    rows = db.execute(
+        select(
+            per_char.c.class_slug,
+            per_char.c.spec,
+            func.count().label("players"),
+            median.label("median"),
+            best_fn(per_char.c.best).label("top"),
+        )
+        .group_by(per_char.c.class_slug, per_char.c.spec)
+        .order_by(median.desc() if hb else median.asc())
+    ).mappings()
+    return {
+        "matches": int(matches or 0),
+        "players": int(players or 0),
+        "last_at": last_at,
+        "higher_better": hb,
+        "min_players": min_players,
+        "specs": [
+            {
+                "class_slug": r["class_slug"],
+                "spec": r["spec"],
+                "players": int(r["players"]),
+                "median": float(r["median"]) if r["median"] is not None else None,
+                "top": float(r["top"]) if r["top"] is not None else None,
+                "low_sample": int(r["players"]) < min_players,
+            }
+            for r in rows
+        ],
+    }
 
 
 # ---------------------------------------------------------------------------

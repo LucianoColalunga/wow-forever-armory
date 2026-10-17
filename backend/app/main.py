@@ -19,6 +19,7 @@ from app import __version__
 from app.api.v1 import admin, auth, content, health, meta, players, rankings, reports, search
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.importer import chunked
 from app.worker.queue import inline_wakeup, notify_new_job
 
 log = logging.getLogger("wfa.api")
@@ -123,12 +124,15 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def guard_and_log(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         rid = request.headers.get("x-request-id", "")[:64] or uuid.uuid4().hex[:16]
-        if request.method == "POST" and request.url.path.endswith("/reports/import"):
+        is_import = request.url.path.endswith("/reports/import")
+        if request.method == "POST" and (is_import or "/reports/uploads/" in request.url.path):
+            # Se exige Content-Length y se corta antes de leer el cuerpo.
+            limit = max_body if is_import else chunked.CHUNK_BYTES + 64 * 1024
             length = request.headers.get("content-length")
             if length is None:
                 return JSONResponse({"detail": "Falta Content-Length."}, status_code=411)
-            if not length.isdigit() or int(length) > max_body:
-                return JSONResponse({"detail": f"El archivo supera {settings.max_upload_mb} MB."}, status_code=413)
+            if not length.isdigit() or int(length) > limit:
+                return JSONResponse({"detail": f"El cuerpo supera {limit // (1024 * 1024)} MB."}, status_code=413)
         start = time.perf_counter()
         response = await call_next(request)
         for k, v in SECURITY_HEADERS.items():

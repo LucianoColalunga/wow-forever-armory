@@ -272,11 +272,16 @@ def ranking_pvp(
     battleground: Annotated[str | None, Query(description="id o slug del campo de batalla")] = None,
     class_slug: Annotated[str | None, Query(alias="class", max_length=16)] = None,
     spec: Annotated[str | None, Query(max_length=24)] = None,
+    faction: Literal["alliance", "horde"] | None = None,
+    q: Annotated[
+        str | None, Query(min_length=2, max_length=24, description="Buscar por nombre (conserva la posición real)")
+    ] = None,
     season_id: int | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
 ) -> dict[str, Any]:
     pg, size = page
+    name_query = q.strip() if q and q.strip() else None
     verified = db.scalars(
         select(Instance)
         .where(Instance.kind == "battleground", Instance.verification.in_(("official", "verified_by_admin")))
@@ -296,8 +301,25 @@ def ranking_pvp(
         season_id=season_id,
         date_from=date_from,
         date_to=date_to,
+        faction=faction,
+        name_query=name_query,
     )
-    key = ("pvp", dataset, metric, method, f.instance_id, class_slug, spec, season_id, date_from, date_to, pg, size)
+    key = (
+        "pvp",
+        dataset,
+        metric,
+        method,
+        f.instance_id,
+        class_slug,
+        spec,
+        faction,
+        (name_query or "").lower(),
+        season_id,
+        date_from,
+        date_to,
+        pg,
+        size,
+    )
 
     def build() -> dict[str, Any]:
         res = methods.partition_ranking(
@@ -329,6 +351,7 @@ def ranking_pvp(
             "page_size": size,
             "battleground": instance_dict(inst),
             "battlegrounds": [instance_dict(i) for i in verified],
+            "summary": methods.spec_summary(db, f, metric),
             "modes": list(PVP_MODES),
             "data": data_meta(db, dataset),
         }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { Card, DataBanners, ErrorState, PageHeader, StatCard } from "@/components/ui";
 import { GuildActivity, ProgressionTable, type ProgressionRow } from "@/components/views/GuildViews";
@@ -10,7 +11,6 @@ import { getDataset } from "@/lib/dataset";
 import { fmtDate, fmtInt } from "@/lib/format";
 import type { Character, DataMeta } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Hermandad" };
 
 interface GuildProfile {
   guild: { id: number; name: string; realm: string; region: string; faction: string | null; dataset: string };
@@ -19,6 +19,31 @@ interface GuildProfile {
   progression: ProgressionRow[];
   activity: { week: string; pulls: number; kills: number }[];
   meta: DataMeta;
+}
+
+const loadGuild = cache((id: string, dataset: string) => apiGet<GuildProfile>(`/guilds/${id}`, { dataset }));
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  if (!/^\d+$/.test(id)) return { title: "Hermandad" };
+  const dataset = await getDataset(await searchParams);
+  try {
+    const { guild: g, members } = await loadGuild(id, dataset);
+    return {
+      title: `<${g.name}>${g.realm ? ` · ${g.realm}` : ""}`,
+      description: `Hermandad ${g.name} en World of Warcraft: Forever: progreso en bandas, ${members.length} miembros, actividad y reportes de combate.`,
+      alternates: { canonical: `/guilds/${id}` },
+      robots: dataset === "demo" ? { index: false, follow: true } : undefined,
+    };
+  } catch {
+    return { title: "Hermandad" };
+  }
 }
 
 export default async function GuildPage({
@@ -33,7 +58,7 @@ export default async function GuildPage({
   const dataset = await getDataset(await searchParams);
   let g: GuildProfile;
   try {
-    g = await apiGet<GuildProfile>(`/guilds/${id}`, { dataset });
+    g = await loadGuild(id, dataset);
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) notFound();
     return <ErrorState message={e instanceof ApiError ? e.message : "Error inesperado."} retryHref={`/guilds/${id}`} />;

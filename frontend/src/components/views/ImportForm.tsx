@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { clientGet, uploadWithProgress } from "@/lib/client-api";
+import { ClientApiError, clientGet, uploadInChunks } from "@/lib/client-api";
 import { fmtBytes } from "@/lib/format";
 import type { User } from "@/lib/types";
 
@@ -41,20 +41,21 @@ export function ImportForm() {
     e.preventDefault();
     if (!file || !formRef.current) return;
     const form = new FormData(formRef.current);
-    form.set("file", file);
     // Los campos opcionales vacíos no se envían (la API los valida como números/enumerados).
-    for (const key of ["title", "guild_name", "guild_realm", "region", "utc_offset"]) {
-      if (!String(form.get(key) ?? "").trim()) form.delete(key);
+    const fields: Record<string, string> = {};
+    for (const key of ["title", "visibility", "guild_name", "guild_realm", "region", "utc_offset"]) {
+      const value = String(form.get(key) ?? "").trim();
+      if (value) fields[key] = value;
     }
     setProgress(0);
     setError(null);
     try {
-      const { status, body } = await uploadWithProgress(form, setProgress);
+      const { status, body } = await uploadInChunks(file, fields, setProgress);
       const detail = body && typeof body === "object" && "detail" in body ? String((body as { detail: unknown }).detail) : null;
       if (status === 200 || status === 202) setResult(body as Result);
       else setError(detail ?? `Error ${status}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de red.");
+      setError(err instanceof ClientApiError || err instanceof Error ? err.message : "Error de red.");
     } finally {
       setProgress(null);
     }
@@ -91,7 +92,9 @@ export function ImportForm() {
         />
         <p id="import-help" className="mt-1 text-xs text-faint">
           WoWCombatLog*.txt de la carpeta <code>Logs</code> del cliente (con Advanced Combat Logging activado), o un .zip con un
-          único archivo. Máximo {MAX_MB} MB. Se rechazan ejecutables y binarios.
+          único archivo. Se sube por partes, así que los logs grandes no tienen problema; si el servidor lo rechaza por
+          tamaño, comprimilo en .zip (un log de texto suele quedar unas 10 veces más chico). Se rechazan ejecutables y
+          binarios.
         </p>
         {file && <p className="mt-1 text-xs text-muted">{file.name} · {fmtBytes(file.size)}</p>}
       </div>
@@ -144,7 +147,9 @@ export function ImportForm() {
           <div className="h-2 overflow-hidden rounded bg-surface-3" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Progreso de subida">
             <div className="h-full bg-gold transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <p className="mt-1 text-xs text-muted">Subiendo… {progress} %</p>
+          <p className="mt-1 text-xs text-muted">
+            {progress < 100 ? `Subiendo… ${progress} %` : "Verificando el archivo…"}
+          </p>
         </div>
       )}
       {error && (

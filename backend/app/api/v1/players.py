@@ -7,13 +7,14 @@ from sqlalchemy import Float, cast, func, or_, select
 
 from app.api.deps import DB, Dataset, Page, SettingsDep
 from app.core import ratelimit
-from app.models import Character, Encounter, Fight, FightParticipant, Guild, RankingEntry, Report
+from app.models import Character, Encounter, Fight, FightParticipant, Guild, Instance, RankingEntry, Report
 from app.services.queries import (
     character_dict,
     count_of,
     data_meta,
     encounter_dict,
     fight_summary,
+    instance_dict,
     paged,
     participant_dict,
     visible_report,
@@ -78,6 +79,60 @@ def list_players(
     rows = db.execute(qry.order_by(*order, Character.id).limit(size).offset((pg - 1) * size)).all()
     items = [{**character_dict(c), "fights": n} for c, n in rows]
     return paged(items, pg, size, total, data_meta(db, dataset))
+
+
+def _peak_position(db: DB, where: list[Any], column: Any, mine: float | None) -> dict[str, int] | None:
+    """Posición del personaje en el ranking de pico (mejor valor por personaje) de una partición.
+
+    Empates comparten posición (1 + cuántos personajes tienen un mejor valor estrictamente mayor).
+    """
+    if mine is None or mine <= 0:
+        return None
+    best = (
+        select(RankingEntry.character_id, func.max(column).label("best"))
+        .where(*where)
+        .group_by(RankingEntry.character_id)
+        .subquery()
+    )
+    total, above = db.execute(select(func.count(), func.count().filter(best.c.best > mine))).one()
+    return {"position": int(above or 0) + 1, "of": int(total or 0)}
+
+
+def _pvp_block(db: DB, character_id: int, dataset: str) -> list[dict[str, Any]]:
+    rows = db.execute(
+        select(
+            RankingEntry.instance_id,
+            func.count(),
+            func.max(RankingEntry.damage_to_players),
+            func.max(RankingEntry.dps),
+            func.max(RankingEntry.hps),
+            func.sum(RankingEntry.killing_blows),
+            func.sum(RankingEntry.deaths),
+            func.max(RankingEntry.occurred_at),
+        )
+        .where(RankingEntry.character_id == character_id, RankingEntry.kind == "pvp", RankingEntry.dataset == dataset)
+        .group_by(RankingEntry.instance_id)
+    ).all()
+    insts = {i.id: i for i in db.scalars(select(Instance).where(Instance.id.in_([r[0] for r in rows] or [-1])))}
+    out: list[dict[str, Any]] = []
+    for inst_id, matches, dmg, dps, hps, kbs, deaths, last_at in rows:
+        part = [RankingEntry.kind == "pvp", RankingEntry.dataset == dataset, RankingEntry.instance_id == inst_id]
+        out.append(
+            {
+                "battleground": instance_dict(insts.get(inst_id)) if inst_id in insts else None,
+                "matches": int(matches or 0),
+                "best_damage_to_players": dmg,
+                "best_dps": dps,
+                "best_hps": hps,
+                "killing_blows": int(kbs or 0),
+                "deaths": int(deaths or 0),
+                "last_match_at": last_at,
+                "damage_position": _peak_position(db, part, RankingEntry.damage_to_players, dmg),
+                "hps_position": _peak_position(db, part, RankingEntry.hps, hps),
+            }
+        )
+    out.sort(key=lambda b: -(b["matches"]))
+    return out
 
 
 @router.get("/players/{player_id}", summary="Perfil de personaje")
@@ -180,6 +235,18 @@ def get_player(player_id: int, db: DB, settings: SettingsDep, dataset: Dataset =
             "best_dps_percentile": r[8] if (r[10] or 0) >= settings.min_bucket_size else None,
             "best_hps_percentile": r[9] if (r[10] or 0) >= settings.min_bucket_size else None,
             "bucket_size": r[10],
+            "dps_position": _peak_position(
+                db,
+                [
+                    RankingEntry.kind == "pve",
+                    RankingEntry.dataset == dataset,
+                    RankingEntry.encounter_id == r[0],
+                    RankingEntry.difficulty_id.is_(None) if r[1] is None else RankingEntry.difficulty_id == r[1],
+                    RankingEntry.group_size.is_(None) if r[2] is None else RankingEntry.group_size == r[2],
+                ],
+                RankingEntry.dps,
+                r[3],
+            ),
         }
         for r in best_rows
     ]
@@ -205,6 +272,7 @@ def get_player(player_id: int, db: DB, settings: SettingsDep, dataset: Dataset =
         "character": character_dict(c),
         "summary": summary,
         "best_by_encounter": best,
+        "pvp": _pvp_block(db, c.id, dataset),
         "recent_fights": [
             {**fight_summary(f), "performance": participant_dict(p, c, include_details=False)} for p, f in recent
         ],

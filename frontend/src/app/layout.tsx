@@ -5,19 +5,25 @@ import type { ReactNode } from "react";
 
 import { SiteHeader } from "@/components/SiteHeader";
 import { getDataset } from "@/lib/dataset";
+import { SITE_NAME, siteUrl } from "@/lib/site";
 
 import "./globals.css";
 
 const cinzel = Cinzel({ subsets: ["latin"], variable: "--font-cinzel", display: "swap", weight: ["500", "700"] });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
+const DESCRIPTION =
+  "Rankings PvP y PvE, perfiles de personajes y análisis de combates de World of Warcraft: Forever, calculados a partir de combat logs. Proyecto de la comunidad, no afiliado a Blizzard Entertainment.";
+
 export const metadata: Metadata = {
-  title: { default: "WoW Forever Armory · Competitive Analytics", template: "%s · Forever Armory" },
-  description:
-    "Estadísticas competitivas de World of Warcraft: Forever construidas a partir de combat logs. Proyecto de la comunidad, no afiliado a Blizzard Entertainment.",
-  applicationName: "WoW Forever Armory",
+  metadataBase: new URL(siteUrl()),
+  title: { default: "WoW Forever Armory · Rankings y estadísticas", template: "%s · Forever Armory" },
+  description: DESCRIPTION,
+  applicationName: SITE_NAME,
   authors: [{ name: "Luciano Colalunga" }],
   robots: { index: true, follow: true },
+  openGraph: { type: "website", siteName: SITE_NAME, locale: "es_AR", description: DESCRIPTION },
+  twitter: { card: "summary" },
 };
 
 export const viewport: Viewport = { themeColor: "#0b0a0f", colorScheme: "dark" };

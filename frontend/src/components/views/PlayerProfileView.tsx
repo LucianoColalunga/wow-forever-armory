@@ -9,6 +9,7 @@ import type { Encounter, FightSummary, Participant } from "@/lib/types";
 import { TimeLineChart } from "../Charts";
 import { type Column, DataTable } from "../DataTable";
 import { Pill } from "../ui";
+import { type Position, PositionTag } from "./PlayerPvp";
 
 export interface BestRow {
   encounter: Encounter | null;
@@ -22,6 +23,7 @@ export interface BestRow {
   best_dps_percentile: number | null;
   best_hps_percentile: number | null;
   bucket_size: number;
+  dps_position?: Position | null;
 }
 
 export interface EvolutionPoint {
@@ -56,6 +58,23 @@ export function BestTable({ rows }: { rows: BestRow[] }) {
     },
     { key: "kills", label: "Kills", align: "right", sortValue: (r) => r.kills, render: (r) => fmtInt(r.kills) },
     { key: "dps", label: "Mejor DPS", align: "right", sortValue: (r) => r.best_dps, render: (r) => fmtDec(r.best_dps) },
+    {
+      key: "dps_pos",
+      label: "Puesto DPS",
+      align: "right",
+      title: "Posición en el ranking de pico del jefe (misma dificultad y tamaño)",
+      sortValue: (r) => r.dps_position?.position ?? null,
+      render: (r) => (
+        <PositionTag
+          pos={r.dps_position}
+          href={
+            r.encounter
+              ? `/rankings/pve/bosses/${r.encounter.id}?metric=dps&role=all&partition=${r.difficulty_id ?? ""}-${r.group_size ?? ""}`
+              : undefined
+          }
+        />
+      ),
+    },
     {
       key: "dps_pct",
       label: "Percentil DPS",

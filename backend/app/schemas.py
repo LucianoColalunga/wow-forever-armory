@@ -157,6 +157,23 @@ class ImportAccepted(BaseModel):
     message: str
 
 
+class UploadStart(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255, description="Nombre del archivo (.txt, .log o .zip)")
+    size: int = Field(gt=0, description="Tamaño total en bytes")
+
+
+class UploadStarted(BaseModel):
+    upload_id: str
+    chunk_size: int = Field(description="Tamaño máximo de cada parte en bytes")
+    max_bytes: int
+
+
+class UploadProgress(BaseModel):
+    received: int
+    size: int
+    next_index: int
+
+
 class LoginIn(BaseModel):
     email: Email
     password: str = Field(min_length=1, max_length=256)

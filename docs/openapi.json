@@ -6,6 +6,31 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/health/ip": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "IP con la que la API identifica al visitante (para verificar el rate limit)",
+        "operationId": "my_ip_api_health_ip_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response My Ip Api Health Ip Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health/live": {
       "get": {
         "tags": [
@@ -683,6 +708,46 @@
               ],
               "title": "Spec"
             }
+          },
+          {
+            "name": "faction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "alliance",
+                    "horde"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Faction"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 24
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Buscar por nombre (conserva la posición real)",
+              "title": "Q"
+            },
+            "description": "Buscar por nombre (conserva la posición real)"
           },
           {
             "name": "season_id",
@@ -2169,6 +2234,7 @@
           "reports"
         ],
         "summary": "Importar un combat log (.txt, .log o .zip con un único archivo)",
+        "description": "Subida en un solo pedido. Detrás de un proxy con límite de cuerpo (la web en Vercel acepta 4,5 MB por pedido) usá la subida por partes: `POST /reports/uploads`.",
         "operationId": "import_report_api_v1_reports_import_post",
         "requestBody": {
           "content": {
@@ -2202,6 +2268,208 @@
           },
           "401": {
             "description": "Requiere autenticación"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/uploads": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Iniciar una subida por partes",
+        "description": "Devuelve un `upload_id`. Después se envían las partes en orden (máximo 4 MB cada una) y se completa la subida. Vence a las 2 horas.",
+        "operationId": "start_upload_api_v1_reports_uploads_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadStarted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/uploads/{upload_id}/chunks/{index}": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Enviar una parte (cuerpo binario, application/octet-stream)",
+        "operationId": "upload_chunk_api_v1_reports_uploads__upload_id__chunks__index__post",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "title": "Upload Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadProgress"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La parte no es la siguiente esperada"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/uploads/{upload_id}/complete": {
+      "post": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Completar una subida por partes y encolar el procesamiento",
+        "operationId": "complete_upload_api_v1_reports_uploads__upload_id__complete_post",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "title": "Upload Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_complete_upload_api_v1_reports_uploads__upload_id__complete_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportAccepted"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "El archivo ya estaba importado"
+          },
+          "413": {
+            "description": "Archivo muy grande"
+          },
+          "415": {
+            "description": "Formato rechazado"
+          },
+          "401": {
+            "description": "Requiere autenticación"
+          },
+          "409": {
+            "description": "Faltan partes"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reports/uploads/{upload_id}": {
+      "delete": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "Cancelar una subida por partes",
+        "operationId": "cancel_upload_api_v1_reports_uploads__upload_id__delete",
+        "parameters": [
+          {
+            "name": "upload_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "title": "Upload Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
@@ -3906,6 +4174,112 @@
         ],
         "title": "ApiKeyIn"
       },
+      "Body_complete_upload_api_v1_reports_uploads__upload_id__complete_post": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "guild_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guild Name"
+          },
+          "guild_realm": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guild Realm"
+          },
+          "region": {
+            "type": "string",
+            "enum": [
+              "",
+              "us",
+              "eu",
+              "kr",
+              "tw",
+              "cn"
+            ],
+            "title": "Region",
+            "default": ""
+          },
+          "faction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "alliance",
+                  "horde"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faction"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ],
+            "title": "Visibility",
+            "default": "public"
+          },
+          "utc_offset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 14.0,
+                "minimum": -12.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utc Offset",
+            "description": "Huso del cliente si el log no lo trae"
+          },
+          "default_year": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 2100.0,
+                "minimum": 2004.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Year"
+          }
+        },
+        "type": "object",
+        "title": "Body_complete_upload_api_v1_reports_uploads__upload_id__complete_post"
+      },
       "Body_import_report_api_v1_reports_import_post": {
         "properties": {
           "file": {
@@ -5029,6 +5403,76 @@
           "payload"
         ],
         "title": "SubmissionIn"
+      },
+      "UploadProgress": {
+        "properties": {
+          "received": {
+            "type": "integer",
+            "title": "Received"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "next_index": {
+            "type": "integer",
+            "title": "Next Index"
+          }
+        },
+        "type": "object",
+        "required": [
+          "received",
+          "size",
+          "next_index"
+        ],
+        "title": "UploadProgress"
+      },
+      "UploadStart": {
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "File Name",
+            "description": "Nombre del archivo (.txt, .log o .zip)"
+          },
+          "size": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Size",
+            "description": "Tamaño total en bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_name",
+          "size"
+        ],
+        "title": "UploadStart"
+      },
+      "UploadStarted": {
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "title": "Upload Id"
+          },
+          "chunk_size": {
+            "type": "integer",
+            "title": "Chunk Size",
+            "description": "Tamaño máximo de cada parte en bytes"
+          },
+          "max_bytes": {
+            "type": "integer",
+            "title": "Max Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upload_id",
+          "chunk_size",
+          "max_bytes"
+        ],
+        "title": "UploadStarted"
       },
       "UserIn": {
         "properties": {

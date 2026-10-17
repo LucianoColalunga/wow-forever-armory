@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, BinaryIO, Literal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi import Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
+from starlette.concurrency import run_in_threadpool
 
-from app.api.deps import DB, Dataset, OptionalAuth, Page, SettingsDep
+from app.api.deps import DB, AuthContext, Dataset, OptionalAuth, Page, SettingsDep
 from app.core import ratelimit
+from app.core.config import Settings
+from app.importer import chunked
 from app.importer.pipeline import ImportMeta, create_import
 from app.importer.validation import InvalidUpload
 from app.models import Fight, ImportJob, Report, ReportIssue, SourceFile
-from app.schemas import ImportAccepted
+from app.schemas import ImportAccepted, UploadProgress, UploadStart, UploadStarted
 from app.services.queries import count_of, data_meta, fight_summary, paged, visible_report
 from app.worker.queue import notify_new_job
 
@@ -118,24 +122,7 @@ def report_status(report_id: str, db: DB, ctx: OptionalAuth) -> dict[str, Any]:
     }
 
 
-@router.post(
-    "/import",
-    status_code=202,
-    response_model=ImportAccepted,
-    summary="Importar un combat log (.txt, .log o .zip con un único archivo)",
-    responses={
-        200: {"description": "El archivo ya estaba importado"},
-        413: {"description": "Archivo muy grande"},
-        415: {"description": "Formato rechazado"},
-        401: {"description": "Requiere autenticación"},
-    },
-)
-def import_report(
-    request: Request,
-    db: DB,
-    settings: SettingsDep,
-    ctx: OptionalAuth,
-    file: Annotated[UploadFile, File(description="WoWCombatLog*.txt o .zip")],
+def import_meta_form(
     title: Annotated[str | None, Form(max_length=128)] = None,
     guild_name: Annotated[str | None, Form(max_length=64)] = None,
     guild_realm: Annotated[str | None, Form(max_length=64)] = None,
@@ -144,14 +131,8 @@ def import_report(
     visibility: Annotated[Literal["public", "private"], Form()] = "public",
     utc_offset: Annotated[int | None, Form(ge=-12, le=14, description="Huso del cliente si el log no lo trae")] = None,
     default_year: Annotated[int | None, Form(ge=2004, le=2100)] = None,
-) -> Any:
-    if ctx is None and not settings.public_uploads:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Iniciá sesión con una cuenta uploader o usá una API key.")
-    if ctx is not None and ctx.user.role not in ("uploader", "admin"):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Tu cuenta no tiene permiso para importar.")
-    who = str(ctx.user.id) if ctx else "anon"
-    ratelimit.enforce(request, "import", settings.rate_limit_import_per_hour, 3600, key_suffix=who)
-    meta = ImportMeta(
+) -> ImportMeta:
+    return ImportMeta(
         title=title,
         guild_name=guild_name or None,
         guild_realm=guild_realm,
@@ -161,11 +142,38 @@ def import_report(
         utc_offset=utc_offset,
         default_year=default_year,
     )
+
+
+MetaForm = Annotated[ImportMeta, Depends(import_meta_form)]
+
+
+def _check_importer(ctx: AuthContext | None, settings: Settings) -> None:
+    if ctx is None and not settings.public_uploads:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Iniciá sesión con una cuenta uploader o usá una API key.")
+    if ctx is not None and ctx.user.role not in ("uploader", "admin"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Tu cuenta no tiene permiso para importar.")
+
+
+def _owner(request: Request, ctx: AuthContext | None) -> str:
+    return f"user:{ctx.user.id}" if ctx else f"anon:{ratelimit.client_ip(request)}"
+
+
+def _invalid(exc: InvalidUpload) -> HTTPException:
+    msg = str(exc)
+    if "máximo" in msg:
+        return HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, msg)
+    if "subidas en curso" in msg:
+        return HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, msg)
+    return HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, msg)
+
+
+def _accept(
+    db: DB, settings: Settings, stream: BinaryIO, name: str | None, meta: ImportMeta, ctx: AuthContext | None
+) -> Any:
     try:
-        outcome = create_import(db, settings, file.file, file.filename, meta, ctx.user if ctx else None)
+        outcome = create_import(db, settings, stream, name, meta, ctx.user if ctx else None)
     except InvalidUpload as exc:
-        code = status.HTTP_413_CONTENT_TOO_LARGE if "máximo" in str(exc) else status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
-        raise HTTPException(code, str(exc)) from exc
+        raise _invalid(exc) from exc
     body = ImportAccepted(
         report_id=outcome.report.public_id,
         status=outcome.report.status,
@@ -180,3 +188,125 @@ def import_report(
         return JSONResponse(body.model_dump(), status_code=200)
     notify_new_job()
     return body
+
+
+_IMPORT_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {"description": "El archivo ya estaba importado"},
+    413: {"description": "Archivo muy grande"},
+    415: {"description": "Formato rechazado"},
+    401: {"description": "Requiere autenticación"},
+}
+
+
+@router.post(
+    "/import",
+    status_code=202,
+    response_model=ImportAccepted,
+    summary="Importar un combat log (.txt, .log o .zip con un único archivo)",
+    description="Subida en un solo pedido. Detrás de un proxy con límite de cuerpo (la web en Vercel acepta "
+    "4,5 MB por pedido) usá la subida por partes: `POST /reports/uploads`.",
+    responses=_IMPORT_RESPONSES,
+)
+def import_report(
+    request: Request,
+    db: DB,
+    settings: SettingsDep,
+    ctx: OptionalAuth,
+    file: Annotated[UploadFile, File(description="WoWCombatLog*.txt o .zip")],
+    meta: MetaForm,
+) -> Any:
+    _check_importer(ctx, settings)
+    who = str(ctx.user.id) if ctx else "anon"
+    ratelimit.enforce(request, "import", settings.rate_limit_import_per_hour, 3600, key_suffix=who)
+    return _accept(db, settings, file.file, file.filename, meta, ctx)
+
+
+@router.post(
+    "/uploads",
+    status_code=201,
+    response_model=UploadStarted,
+    summary="Iniciar una subida por partes",
+    description=f"Devuelve un `upload_id`. Después se envían las partes en orden (máximo "
+    f"{chunked.CHUNK_BYTES // (1024 * 1024)} MB cada una) y se completa la subida. Vence a las 2 horas.",
+)
+def start_upload(request: Request, settings: SettingsDep, ctx: OptionalAuth, body: UploadStart) -> UploadStarted:
+    _check_importer(ctx, settings)
+    who = str(ctx.user.id) if ctx else "anon"
+    ratelimit.enforce(request, "import", settings.rate_limit_import_per_hour, 3600, key_suffix=who)
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    try:
+        sess = chunked.start(settings.storage_dir, _owner(request, ctx), body.file_name, body.size, max_bytes)
+    except InvalidUpload as exc:
+        raise _invalid(exc) from exc
+    return UploadStarted(upload_id=sess.id, chunk_size=chunked.CHUNK_BYTES, max_bytes=max_bytes)
+
+
+def _session(settings: Settings, request: Request, ctx: AuthContext | None, upload_id: str) -> chunked.UploadSession:
+    try:
+        return chunked.load(settings.storage_dir, upload_id, _owner(request, ctx))
+    except chunked.UploadNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La subida no existe o venció: empezala de nuevo.") from exc
+
+
+@router.post(
+    "/uploads/{upload_id}/chunks/{index}",
+    response_model=UploadProgress,
+    summary="Enviar una parte (cuerpo binario, application/octet-stream)",
+    responses={409: {"description": "La parte no es la siguiente esperada"}},
+)
+async def upload_chunk(
+    request: Request,
+    settings: SettingsDep,
+    ctx: OptionalAuth,
+    upload_id: Annotated[str, PathParam(max_length=64)],
+    index: Annotated[int, PathParam(ge=0, le=100_000)],
+) -> UploadProgress:
+    _check_importer(ctx, settings)
+    ratelimit.enforce(request, "upload-chunk", 600, 60, key_suffix=upload_id)
+    sess = _session(settings, request, ctx, upload_id)
+    data = await request.body()
+    try:
+        sess = await run_in_threadpool(chunked.append_chunk, settings.storage_dir, sess, index, data)
+    except chunked.ChunkOutOfOrder as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except chunked.UploadNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La subida no existe o venció: empezala de nuevo.") from exc
+    except InvalidUpload as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    return UploadProgress(received=sess.received, size=sess.size, next_index=sess.next_index)
+
+
+@router.post(
+    "/uploads/{upload_id}/complete",
+    status_code=202,
+    response_model=ImportAccepted,
+    summary="Completar una subida por partes y encolar el procesamiento",
+    responses={**_IMPORT_RESPONSES, 409: {"description": "Faltan partes"}},
+)
+def complete_upload(
+    request: Request,
+    db: DB,
+    settings: SettingsDep,
+    ctx: OptionalAuth,
+    upload_id: Annotated[str, PathParam(max_length=64)],
+    meta: MetaForm,
+) -> Any:
+    _check_importer(ctx, settings)
+    sess = _session(settings, request, ctx, upload_id)
+    if not sess.complete:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Faltan partes: llegaron {sess.received} de {sess.size} bytes.")
+    try:
+        with chunked.open_data(settings.storage_dir, sess) as fh:
+            return _accept(db, settings, fh, sess.file_name, meta, ctx)
+    finally:
+        chunked.discard(settings.storage_dir, sess.id)
+
+
+@router.delete("/uploads/{upload_id}", status_code=204, summary="Cancelar una subida por partes")
+def cancel_upload(
+    request: Request, settings: SettingsDep, ctx: OptionalAuth, upload_id: Annotated[str, PathParam(max_length=64)]
+) -> Response:
+    _check_importer(ctx, settings)
+    sess = _session(settings, request, ctx, upload_id)
+    chunked.discard(settings.storage_dir, sess.id)
+    return Response(status_code=204)

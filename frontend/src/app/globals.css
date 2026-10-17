@@ -18,6 +18,8 @@
   --color-warning: #e8b04f;
   --color-success: #7cc892;
   --color-demo: #c3a1ef;
+  --color-alliance: #6f9df0;
+  --color-horde: #ec6a5c;
 
   --font-display: var(--font-cinzel), "Times New Roman", serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;

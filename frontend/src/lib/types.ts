@@ -189,6 +189,25 @@ export interface RankingRow {
   character_spec: string | null;
   guild_id: number | null;
   guild_name: string | null;
+  faction?: string | null;
+}
+
+export interface SpecSummaryRow {
+  class_slug: string;
+  spec: string | null;
+  players: number;
+  median: number | null;
+  top: number | null;
+  low_sample: boolean;
+}
+
+export interface SpecSummary {
+  matches: number;
+  players: number;
+  last_at: string | null;
+  higher_better: boolean;
+  min_players: number;
+  specs: SpecSummaryRow[];
 }
 
 export interface RankingMeta {

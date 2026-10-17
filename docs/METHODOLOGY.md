@@ -59,6 +59,14 @@ umbrales.
 
 ## PvP
 
+**Rendimiento por especialización** (página PvP): por cada personaje se toma su mejor valor en el
+campo de batalla y período elegidos; por clase y spec se informa la **mediana** de esos mejores
+valores y el máximo. Cada jugador cuenta una vez, así un jugador con muchas partidas no inclina el
+resultado. Specs con menos de 3 jugadores se marcan como «muestra chica».
+
+**Puesto** (perfil): posición en el ranking de pico de la partición = 1 + cantidad de personajes con
+un mejor valor estrictamente superior (los empates comparten puesto).
+
 Sólo modalidades confirmadas (Darkspear Islands). Métricas: daño a jugadores, DPS, HPS, golpes de
 gracia y muertes, con métodos A y B. Los logs en campos de batalla son **parciales** (el cliente
 registra eventos cercanos a quien graba) y se aclara en la interfaz. No hay rating ni puntuación

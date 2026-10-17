@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 export interface FilterOption {
   value: string;
@@ -11,11 +11,62 @@ export interface FilterOption {
 export interface FilterDef {
   name: string;
   label: string;
-  type: "select" | "date";
+  type: "select" | "date" | "search";
+  placeholder?: string;
   options?: FilterOption[];
   /** Valor actual efectivo (puede venir de un default del servidor). */
   value: string;
   help?: string;
+}
+
+/** Campo de texto que actualiza la URL al dejar de escribir (o con Enter). Mínimo 2 caracteres. */
+function SearchField({
+  id,
+  value,
+  placeholder,
+  onCommit,
+}: {
+  id: string;
+  value: string;
+  placeholder?: string;
+  onCommit: (v: string) => void;
+}) {
+  const [text, setText] = useState(value);
+  const last = useRef(value);
+  const commit = useRef(onCommit);
+  commit.current = onCommit;
+  useEffect(() => {
+    setText(value);
+    last.current = value;
+  }, [value]);
+  useEffect(() => {
+    const v = text.trim();
+    if (v === last.current || (v.length > 0 && v.length < 2)) return;
+    const t = setTimeout(() => {
+      last.current = v;
+      commit.current(v);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [text]);
+  return (
+    <input
+      id={id}
+      type="search"
+      value={text}
+      maxLength={24}
+      placeholder={placeholder}
+      autoComplete="off"
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => {
+        const v = text.trim();
+        if (e.key === "Enter" && v !== last.current && (v.length === 0 || v.length >= 2)) {
+          last.current = v;
+          onCommit(v);
+        }
+      }}
+      className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm"
+    />
+  );
 }
 
 /** Filtros que viven en la URL: compartibles, navegables con atrás/adelante y accesibles por teclado. */
@@ -63,6 +114,8 @@ export function FilterBar({ filters, resetKeys = [] }: { filters: FilterDef[]; r
                   </option>
                 ))}
               </select>
+            ) : f.type === "search" ? (
+              <SearchField id={id} value={f.value} placeholder={f.placeholder} onCommit={(v) => update(f.name, v)} />
             ) : (
               <input
                 id={id}

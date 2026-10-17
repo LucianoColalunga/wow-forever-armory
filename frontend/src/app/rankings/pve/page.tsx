@@ -9,7 +9,11 @@ import { first, getDataset, pageParam } from "@/lib/dataset";
 import { METHOD_OPTIONS, classOptions, metricOptions, roleOptions, seasonOptions, specOptions } from "@/lib/options";
 import type { Instance, RankingResponse, Season } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Ranking general PvE" };
+export const metadata: Metadata = {
+  title: "Ranking general PvE",
+  description: "Ranking PvE de World of Warcraft: Forever por bandas y jefes: DPS, HPS, absorciones, supervivencia y percentiles por clase.",
+  alternates: { canonical: "/rankings/pve" },
+};
 
 const GENERAL = ["dps", "hps", "aps", "damage_done", "healing_effective", "absorbs_provided", "interrupts", "dispels", "survival_pct"];
 const DEFAULT_ROLE: Record<string, string> = { dps: "dps", damage_done: "dps", hps: "healer", healing_effective: "healer" };

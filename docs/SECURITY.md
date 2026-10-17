@@ -27,6 +27,10 @@
 - UTF-8 obligatorio y primera línea con formato de combat log.
 - Los archivos se guardan con su SHA-256 como nombre (sin datos del usuario en rutas).
 - Rate limit de importación por usuario/IP.
+- **Subida por partes** (`/reports/uploads`): la web la usa siempre porque Vercel corta los pedidos de
+  más de 4,5 MB. Partes de 4 MB como máximo, en orden, sólo de la cuenta que inició la subida; como
+  mucho 3 subidas en curso por cuenta; las sesiones vencen a las 2 horas y se borran solas. Al
+  completar, el archivo pasa por la misma validación que una subida directa.
 
 ## Inyección y XSS
 
@@ -44,6 +48,16 @@ Ventana deslizante por IP: lecturas públicas, búsqueda, login (por IP + email)
 **Límite por proceso**: con varias réplicas de la API cada una cuenta por separado; para un límite
 global, reemplazar `SlidingWindowLimiter` por Redis. La IP real se toma de `X-Forwarded-For` sólo
 si el par inmediato está en `TRUSTED_PROXIES` (IPs o CIDR), recorriendo de derecha a izquierda.
+
+### IP del visitante detrás de Vercel y Render
+
+- **Vercel → API**: el proxy agrega `x-wfa-client-ip` con el secreto `PROXY_SHARED_SECRET`. Si el
+  secreto no está cargado en Vercel, toda la web comparte un mismo límite (la IP de Vercel).
+- **Pedidos directos a Render**: llegan a través de su borde (Cloudflare). `CLIENT_IP_HEADER` permite
+  tomar la IP de una cabecera que ese borde escribe y **sobrescribe** (p. ej. `cf-connecting-ip`).
+  Antes de activarlo, verificar que no se puede falsificar:
+  `curl -H "cf-connecting-ip: 203.0.113.9" https://<api>/api/health/ip` tiene que devolver tu IP real,
+  no `203.0.113.9`. Si devuelve la falsa, no activarlo.
 
 ## Secretos y logs
 

@@ -97,6 +97,18 @@ export function ClassName({
   );
 }
 
+/** Facción con texto (el color acompaña, nunca es la única señal). */
+export function FactionTag({ faction }: { faction: string | null | undefined }) {
+  if (faction !== "alliance" && faction !== "horde") return <span className="text-xs text-faint">—</span>;
+  const horde = faction === "horde";
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs ${horde ? "text-horde" : "text-alliance"}`}>
+      <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${horde ? "bg-horde" : "bg-alliance"}`} />
+      {horde ? "Horda" : "Alianza"}
+    </span>
+  );
+}
+
 export function SpecTag({ classSlug, spec }: { classSlug: string | null | undefined; spec?: string | null }) {
   return (
     <span className="text-xs text-muted">

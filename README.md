@@ -26,14 +26,14 @@ implementadas como adaptadores desactivados con su motivo documentado.
 |---|---|
 | Dashboard | Totales, últimos kills, destacados de la semana, actividad diaria, estado de las fuentes |
 | Rankings PvE | General (varios jefes, normalizado) y por jefe; métodos **A · Pico**, **B · Consistencia** y **C · Percentil** por clase/spec con muestra mínima; DPS, daño total, HPS efectivo, curación efectiva, absorciones/s y totales, daño recibido, muertes, supervivencia, interrupciones y dispels |
-| Rankings PvP | Sólo modalidades confirmadas (campo de batalla Darkspear Islands); sin ratings inventados |
+| Rankings PvP | Sólo modalidades confirmadas (campo de batalla Darkspear Islands); sin ratings inventados. Búsqueda por nombre que conserva el puesto real, filtro de facción y clase/spec, y rendimiento típico por especialización |
 | Contenido | Bandas, mazmorras y campos de batalla con estado de verificación y fuente |
-| Perfiles | Personaje (mejores marcas, percentiles, evolución, historial) y hermandad (progreso, miembros, actividad) |
+| Perfiles | Personaje (mejores marcas con puesto y percentil, PvP por campo de batalla, evolución, historial) y hermandad (progreso, miembros, actividad) |
 | Buscador | Global, tolerante a errores de tipeo (PostgreSQL `pg_trgm`) |
 | Comparador | 2 a 4 personajes, sólo dentro del mismo jefe, dificultad y tamaño |
 | Equipo y lanzamientos | Por pelea: equipo de cada jugador (ranura, ID y nivel de objeto, encantamientos y gemas, según `COMBATANT_INFO`) y línea de tiempo de qué hechizo usó en cada momento (`SPELL_CAST_SUCCESS`) |
 | Historial | Kills, wipes (con % de vida del jefe), recorridos de mazmorra y partidas PvP |
-| Importador | Validación segura, deduplicación, cola con reintentos, parser versionado y reprocesable, trazabilidad hasta la línea del archivo |
+| Importador | Subida por partes (logs grandes aunque la web esté detrás de un proxy con límite de 4,5 MB), validación segura, deduplicación, cola con reintentos, parser versionado y reprocesable, trazabilidad hasta la línea del archivo |
 | Admin | Correcciones auditadas (clase/spec, hermandad, privacidad, exclusiones, outliers, verificación de instancias), usuarios, trabajos, aportes de usuarios |
 | API REST | `/api/v1/...` con OpenAPI en `/api/docs` (también [docs/openapi.json](docs/openapi.json)) |
 
